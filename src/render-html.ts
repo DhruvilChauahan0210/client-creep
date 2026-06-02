@@ -1,276 +1,101 @@
-#!/usr/bin/env node
-import {
-  analyze,
-  resetAliases,
-  resetWorkspaceCache
-} from "./chunk-EYRBZVM6.js";
+import fs from "node:fs";
+import path from "node:path";
+import type { AnalysisResult } from "./types.js";
 
-// src/cli.ts
-import { cac } from "cac";
-import pc3 from "picocolors";
-import path3 from "path";
-
-// src/render.ts
-import pc from "picocolors";
-import path from "path";
-function formatBytes(bytes) {
+function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
-function clientLabel(text) {
-  return pc.bold(pc.yellow(text));
-}
-function serverLabel(text) {
-  return pc.bold(pc.blue(text));
-}
-function dimPath(p) {
-  const dir = path.dirname(p);
-  const base = path.basename(p);
-  return pc.dim(dir === "." ? "" : dir + "/") + base;
-}
-function renderChain(chain, projectRoot) {
-  const lines = [];
-  for (let i = 0; i < chain.length; i++) {
-    const filePath = chain[i];
-    const rel = path.relative(projectRoot, filePath);
-    const indent = "  ".repeat(i);
-    const connector = i === 0 ? "" : `${indent}\u2514\u2500 `;
-    const isRoot = i === 0;
-    const label = isRoot ? `${connector}${pc.bold(pc.yellow("\u26A1"))} ${clientLabel(rel)} ${pc.dim("\u2190 use client")}` : `${connector}${dimPath(rel)}`;
-    lines.push(label);
-  }
-  return lines.join("\n");
-}
-function renderTerminal(result) {
-  const {
-    projectRoot,
-    totalFiles,
-    clientBoundaries,
-    clientGraph,
-    creepCandidates,
-    totalClientBytes,
-    recoverableBytes,
-    whyTraces
-  } = result;
-  const LINE = pc.dim("\u2500".repeat(60));
-  console.log();
-  console.log(LINE);
-  console.log(
-    pc.bold("  client-creep") + pc.dim("  Next.js client component analysis")
-  );
-  console.log(LINE);
-  console.log();
-  console.log(
-    "  " + pc.bold("Project:") + " " + pc.dim(projectRoot)
-  );
-  console.log(
-    "  " + pc.bold("Files scanned:") + " " + totalFiles
-  );
-  console.log(
-    "  " + pc.bold("Client components:") + " " + clientLabel(`${clientGraph.length}`) + pc.dim(` (${clientBoundaries.length} boundaries)`)
-  );
-  console.log(
-    "  " + pc.bold("Estimated client JS:") + " " + pc.bold(pc.yellow(formatBytes(totalClientBytes))) + pc.dim("  (estimate \u2014 raw source bytes)")
-  );
-  if (recoverableBytes > 0) {
-    console.log(
-      "  " + pc.bold("Potentially recoverable:") + " " + pc.bold(pc.green(formatBytes(recoverableBytes))) + pc.dim(`  (${creepCandidates.length} creep candidates)`)
-    );
-  }
-  console.log();
-  if (clientBoundaries.length === 0) {
-    console.log(serverLabel("  \u2713 No client boundaries found."));
-    console.log();
-    return;
-  }
-  console.log(LINE);
-  console.log(pc.bold("  Client Boundaries"));
-  console.log(LINE);
-  console.log();
-  for (const boundary of clientBoundaries) {
-    const signals = boundary.clientSignals.length > 0 ? pc.dim("  signals: ") + pc.cyan(boundary.clientSignals.slice(0, 4).join(", ")) : pc.dim("  ") + pc.red("no client signals detected") + pc.dim(" \u2190 possibly unnecessary");
-    console.log(
-      "  " + pc.yellow("\u26A1") + " " + pc.bold(boundary.displayPath) + signals
-    );
-    const pulled = clientGraph.filter(
-      (n) => !n.isClientBoundary && whyTraces.get(n.filePath)?.boundaryRoot === boundary.filePath
-    );
-    if (pulled.length > 0) {
-      const shown = pulled.slice(0, 3);
-      for (const dep of shown) {
-        console.log("     " + pc.dim("\u2514\u2500") + " " + pc.dim(dep.displayPath));
-      }
-      if (pulled.length > 3) {
-        console.log("     " + pc.dim(`\u2514\u2500 \u2026 and ${pulled.length - 3} more`));
-      }
-    }
-    console.log();
-  }
-  if (creepCandidates.length > 0) {
-    console.log(LINE);
-    console.log(
-      pc.bold("  \u26A0  Accidental Client Creep") + pc.dim("  \u2014 components that may not need to be client")
-    );
-    console.log(LINE);
-    console.log();
-    const shown = creepCandidates.slice(0, 10);
-    for (const candidate of shown) {
-      console.log(
-        "  " + pc.red("\u26A0") + " " + pc.bold(candidate.displayPath) + "  " + pc.dim(formatBytes(candidate.recoverableBytes)) + " potentially recoverable"
-      );
-      console.log(
-        "    " + pc.dim(candidate.reason)
-      );
-      const trace = candidate.whyTrace;
-      if (trace.chain.length > 1) {
-        console.log("    " + pc.dim("Why client:"));
-        console.log(
-          renderChain(trace.chain, projectRoot).split("\n").map((l) => "    " + l).join("\n")
-        );
-      }
-      console.log();
-    }
-    if (creepCandidates.length > 10) {
-      console.log(
-        pc.dim(`  \u2026 and ${creepCandidates.length - 10} more creep candidates. Use --json for full output.`)
-      );
-      console.log();
-    }
-  }
-  const unnecessaryBoundaries = clientBoundaries.filter(
-    (b) => b.clientSignals.length === 0
-  );
-  if (unnecessaryBoundaries.length > 0) {
-    console.log(LINE);
-    console.log(
-      pc.bold("  \u2139  Possibly Unnecessary Boundaries") + pc.dim("  \u2014 'use client' with no detected client signals")
-    );
-    console.log(LINE);
-    console.log();
-    for (const b of unnecessaryBoundaries) {
-      console.log(
-        "  " + pc.yellow("?") + " " + pc.bold(b.displayPath) + pc.dim("  \u2014 review: no hooks, event handlers, or browser APIs found")
-      );
-    }
-    console.log();
-  }
-  console.log(LINE);
-  console.log(
-    pc.dim(
-      "  Sizes are estimates (raw source bytes). Run npx @next/bundle-analyzer for exact bundle impact."
-    )
-  );
-  console.log(LINE);
-  console.log();
-}
-function renderJson(result) {
-  const output = {
-    projectRoot: result.projectRoot,
-    totalFiles: result.totalFiles,
-    summary: {
-      clientComponents: result.clientGraph.length,
-      clientBoundaries: result.clientBoundaries.length,
-      serverComponents: result.serverGraph.length,
-      estimatedClientBytes: result.totalClientBytes,
-      recoverableBytes: result.recoverableBytes,
-      creepCandidates: result.creepCandidates.length
-    },
-    boundaries: result.clientBoundaries.map((b) => ({
-      file: b.displayPath,
-      signals: b.clientSignals,
-      sizeBytes: b.sizeBytes
-    })),
-    creepCandidates: result.creepCandidates.map((c) => ({
-      file: c.displayPath,
-      reason: c.reason,
-      recoverableBytes: c.recoverableBytes,
-      whyChain: c.whyTrace.chain.map(
-        (f) => path.relative(result.projectRoot, f)
-      )
-    }))
-  };
-  console.log(JSON.stringify(output, null, 2));
-}
 
-// src/render-html.ts
-import fs from "fs";
-import path2 from "path";
-function formatBytes2(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-}
-function renderHtml(result, outputPath) {
+export function renderHtml(result: AnalysisResult, outputPath: string): void {
   const html = buildHtml(result);
   fs.writeFileSync(outputPath, html, "utf-8");
 }
-function buildHtml(result) {
-  const nodes = [];
-  const links = [];
-  const nodeIndex = /* @__PURE__ */ new Map();
-  const visibleFiles = /* @__PURE__ */ new Set();
+
+function buildHtml(result: AnalysisResult): string {
+  const nodes: GraphNode[] = [];
+  const links: GraphLink[] = [];
+  const nodeIndex = new Map<string, number>();
+
+  // Build node list — limit to client graph + direct server neighbours for perf
+  const visibleFiles = new Set<string>();
   for (const n of result.clientGraph) visibleFiles.add(n.filePath);
+  // Add server nodes that are direct imports of client boundaries (context)
   for (const b of result.clientBoundaries) {
     const node = result.clientGraph.find((n) => n.filePath === b.filePath);
     if (node) node.imports.forEach((i) => visibleFiles.add(i));
   }
+
   const isCreep = new Set(result.creepCandidates.map((c) => c.filePath));
+
   let idx = 0;
   for (const filePath of visibleFiles) {
-    const node = result.clientGraph.find((n) => n.filePath === filePath) || result.serverGraph.find((n) => n.filePath === filePath);
+    const node =
+      result.clientGraph.find((n) => n.filePath === filePath) ||
+      result.serverGraph.find((n) => n.filePath === filePath);
     if (!node) continue;
-    let type = "server";
+
+    let type: "boundary" | "creep" | "client" | "server" = "server";
     if (node.isClientBoundary) type = "boundary";
     else if (isCreep.has(filePath)) type = "creep";
     else if (node.isClientGraph) type = "client";
+
     const trace = result.whyTraces.get(filePath);
     nodes.push({
       id: idx,
-      label: path2.basename(filePath),
+      label: path.basename(filePath),
       path: node.displayPath,
       type,
       size: node.sizeBytes,
       signals: node.clientSignals,
-      whyChain: trace ? trace.chain.map((f) => path2.relative(result.projectRoot, f)) : []
+      whyChain: trace
+        ? trace.chain.map((f) => path.relative(result.projectRoot, f))
+        : [],
     });
     nodeIndex.set(filePath, idx);
     idx++;
   }
+
+  // Build links
   for (const [filePath, deps] of Object.entries(
     Object.fromEntries(
       [...visibleFiles].map((f) => {
-        const node = result.clientGraph.find((n) => n.filePath === f) || result.serverGraph.find((n) => n.filePath === f);
+        const node =
+          result.clientGraph.find((n) => n.filePath === f) ||
+          result.serverGraph.find((n) => n.filePath === f);
         return [f, node?.imports ?? []];
       })
     )
   )) {
     const sourceIdx = nodeIndex.get(filePath);
-    if (sourceIdx === void 0) continue;
-    for (const dep of deps) {
+    if (sourceIdx === undefined) continue;
+    for (const dep of deps as string[]) {
       const targetIdx = nodeIndex.get(dep);
-      if (targetIdx !== void 0) {
+      if (targetIdx !== undefined) {
         links.push({ source: sourceIdx, target: targetIdx });
       }
     }
   }
+
   const data = JSON.stringify({ nodes, links });
   const summary = {
     totalFiles: result.totalFiles,
     clientComponents: result.clientGraph.length,
     clientBoundaries: result.clientBoundaries.length,
     serverComponents: result.serverGraph.length,
-    estimatedClientJs: formatBytes2(result.totalClientBytes),
-    recoverable: formatBytes2(result.recoverableBytes),
+    estimatedClientJs: formatBytes(result.totalClientBytes),
+    recoverable: formatBytes(result.recoverableBytes),
     creepCandidates: result.creepCandidates.length,
-    projectRoot: result.projectRoot
+    projectRoot: result.projectRoot,
   };
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>client-creep \u2014 ${path2.basename(result.projectRoot)}</title>
+<title>client-creep — ${path.basename(result.projectRoot)}</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -354,7 +179,7 @@ function buildHtml(result) {
 <body>
 
 <div id="header">
-  <h1>\u26A1 client-creep</h1>
+  <h1>⚡ client-creep</h1>
   <span class="project">${summary.projectRoot}</span>
   <div class="stats">
     <div class="stat client"><div class="val">${summary.clientComponents}</div><div class="lbl">client</div></div>
@@ -374,7 +199,7 @@ function buildHtml(result) {
   <button class="filter-btn active" data-filter="all">All</button>
   <button class="filter-btn" data-filter="boundaries">Boundaries only</button>
   <button class="filter-btn" data-filter="creep">Creep only</button>
-  <input id="search" type="text" placeholder="Search files\u2026">
+  <input id="search" type="text" placeholder="Search files…">
 </div>
 
 <div id="main">
@@ -490,7 +315,7 @@ function updateSidebar(node) {
     return;
   }
 
-  const badgeLabel = { boundary: '\u26A1 use client boundary', creep: '\u26A0 accidental creep', client: 'client (transitive)', server: 'server component' };
+  const badgeLabel = { boundary: '⚡ use client boundary', creep: '⚠ accidental creep', client: 'client (transitive)', server: 'server component' };
   const signalsHtml = node.signals.length
     ? node.signals.map(s => \`<span class="signal-tag">\${s}</span>\`).join('')
     : '<span style="color:var(--dim);font-size:12px">none detected</span>';
@@ -499,7 +324,7 @@ function updateSidebar(node) {
     ? node.whyChain.map((f, i) => {
         const isBoundary = i === 0;
         return \`<div class="chain-item \${isBoundary ? 'boundary-node' : ''}">
-          \${i > 0 ? '<span class="chain-arrow">' + '  '.repeat(i) + '\u2514\u2500</span>' : '\u26A1'}
+          \${i > 0 ? '<span class="chain-arrow">' + '  '.repeat(i) + '└─</span>' : '⚡'}
           \${f}
         </div>\`;
       }).join('')
@@ -556,111 +381,17 @@ window.addEventListener('resize', render);
 </html>`;
 }
 
-// src/watch.ts
-import fs2 from "fs";
-import pc2 from "picocolors";
-async function runWatch(targetDir) {
-  let debounce = null;
-  let running = false;
-  const run = async () => {
-    if (running) return;
-    running = true;
-    process.stdout.write("\x1Bc");
-    process.stdout.write(pc2.dim("  Scanning\u2026\r"));
-    try {
-      resetAliases();
-      resetWorkspaceCache();
-      const result = await analyze(targetDir);
-      renderTerminal(result);
-      console.log(pc2.dim("  Watching for changes\u2026 (Ctrl+C to stop)"));
-    } catch (err) {
-      console.error(pc2.red(`  Error: ${err instanceof Error ? err.message : String(err)}`));
-    } finally {
-      running = false;
-    }
-  };
-  await run();
-  const watcher = fs2.watch(
-    targetDir,
-    { recursive: true },
-    (_event, filename) => {
-      if (!filename) return;
-      if (filename.includes("node_modules") || filename.includes(".next") || filename.includes("dist") || filename.includes(".git"))
-        return;
-      if (!/\.(tsx?|jsx?|mjs|mts)$/.test(filename)) return;
-      if (debounce) clearTimeout(debounce);
-      debounce = setTimeout(run, 400);
-    }
-  );
-  process.on("SIGINT", () => {
-    watcher.close();
-    console.log(pc2.dim("\n  Stopped watching."));
-    process.exit(0);
-  });
-  await new Promise(() => {
-  });
+interface GraphNode {
+  id: number;
+  label: string;
+  path: string;
+  type: "boundary" | "creep" | "client" | "server";
+  size: number;
+  signals: string[];
+  whyChain: string[];
 }
 
-// src/cli.ts
-var cli = cac("client-creep");
-cli.command("[dir]", "Analyze a Next.js project for client component creep").option("--dir <path>", "Path to the Next.js project (alias for positional arg)").option("--json", "Output results as JSON").option("--html [file]", "Write an interactive HTML report (default: client-creep-report.html)").option("--watch", "Watch for file changes and re-run analysis").option("--ci", "CI mode: exit 1 if client creep is detected").option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold").action(async (dir = ".", options) => {
-  const targetDir = options.dir ?? dir ?? ".";
-  if (options.watch) {
-    await runWatch(path3.resolve(targetDir));
-    return;
-  }
-  try {
-    if (!options.json && !options.html) {
-      process.stdout.write(pc3.dim("  Scanning\u2026\r"));
-    }
-    const result = await analyze(targetDir);
-    if (options.html !== void 0 && options.html !== false) {
-      const outFile = typeof options.html === "string" ? options.html : "client-creep-report.html";
-      renderHtml(result, outFile);
-      if (!options.json) {
-        console.log(pc3.green(`  \u2713 HTML report written to ${outFile}`));
-      }
-    }
-    if (options.json) {
-      renderJson(result);
-    } else if (!options.html) {
-      renderTerminal(result);
-    }
-    if (options.ci || options.budget) {
-      const budgetKb = options.budget ? Number(options.budget) : void 0;
-      let failed = false;
-      if (budgetKb !== void 0) {
-        const actualKb = result.totalClientBytes / 1024;
-        if (actualKb > budgetKb) {
-          failed = true;
-          if (!options.json) {
-            console.error(pc3.red(`
-  \u2717 client-creep: budget exceeded`));
-            console.error(pc3.red(`    ${actualKb.toFixed(1)} KB client JS > ${budgetKb} KB limit`));
-            console.error(pc3.dim(`    Run without --ci to see the full report and where to recover KB.`));
-          }
-        }
-      }
-      if (options.ci && result.creepCandidates.length > 0) {
-        failed = true;
-        if (!options.json) {
-          console.error(pc3.red(`
-  \u2717 client-creep: ${result.creepCandidates.length} accidental creep candidates found`));
-          console.error(pc3.dim(`    ~${(result.recoverableBytes / 1024).toFixed(0)} KB potentially recoverable.`));
-          console.error(pc3.dim(`    Run without --ci to see the full report.`));
-        }
-      }
-      if (!failed && !options.json) {
-        console.log(pc3.green(`  \u2713 client-creep: no issues found`));
-      }
-      if (failed) process.exit(1);
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(pc3.red(`  Error: ${message}`));
-    process.exit(1);
-  }
-});
-cli.help();
-cli.version("0.1.2");
-cli.parse();
+interface GraphLink {
+  source: number;
+  target: number;
+}

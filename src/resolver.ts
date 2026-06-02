@@ -1,6 +1,8 @@
 import path from "node:path";
 import fs from "node:fs";
 import { getTsconfig } from "get-tsconfig";
+import type { WorkspacePackage } from "./monorepo.js";
+import { resolveWorkspaceImport } from "./monorepo.js";
 
 const EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".mts"];
 
@@ -10,6 +12,11 @@ export interface TsPathAliases {
 }
 
 let _aliases: TsPathAliases | null = null;
+let _workspacePackages: Map<string, WorkspacePackage> = new Map();
+
+export function setWorkspacePackages(packages: Map<string, WorkspacePackage>): void {
+  _workspacePackages = packages;
+}
 
 export function loadAliases(projectRoot: string): TsPathAliases {
   if (_aliases) return _aliases;
@@ -83,7 +90,7 @@ export function resolveImport(
 ): string | null {
   // Skip bare node_modules specifiers
   if (!importSource.startsWith(".") && !importSource.startsWith("/")) {
-    // Check tsconfig path aliases
+    // 1. Check tsconfig path aliases
     for (const [aliasKey, aliasPaths] of Object.entries(aliases.paths)) {
       const aliasPrefix = aliasKey.replace(/\*$/, "");
       if (importSource.startsWith(aliasPrefix)) {
@@ -93,6 +100,11 @@ export function resolveImport(
           if (resolved) return resolved;
         }
       }
+    }
+    // 2. Check workspace packages (monorepo)
+    if (_workspacePackages.size > 0) {
+      const wsResolved = resolveWorkspaceImport(importSource, _workspacePackages);
+      if (wsResolved) return wsResolved;
     }
     return null; // external package
   }

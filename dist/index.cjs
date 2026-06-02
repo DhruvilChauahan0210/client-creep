@@ -69,8 +69,8 @@ function resolveProjectRoot(dir) {
 }
 
 // src/graph.ts
-var import_node_path3 = __toESM(require("path"), 1);
-var import_node_fs4 = __toESM(require("fs"), 1);
+var import_node_path4 = __toESM(require("path"), 1);
+var import_node_fs5 = __toESM(require("fs"), 1);
 
 // src/parser.ts
 var import_parser = require("@babel/parser");
@@ -233,11 +233,132 @@ function parseFile(filePath) {
 }
 
 // src/resolver.ts
+var import_node_path3 = __toESM(require("path"), 1);
+var import_node_fs4 = __toESM(require("fs"), 1);
+var import_get_tsconfig = require("get-tsconfig");
+
+// src/monorepo.ts
 var import_node_path2 = __toESM(require("path"), 1);
 var import_node_fs3 = __toESM(require("fs"), 1);
-var import_get_tsconfig = require("get-tsconfig");
-var EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".mts"];
+var import_tinyglobby2 = require("tinyglobby");
+var _workspaceCache = null;
+function resetWorkspaceCache() {
+  _workspaceCache = null;
+}
+function findMonorepoRoot(projectRoot) {
+  let dir = projectRoot;
+  const root = import_node_path2.default.parse(dir).root;
+  while (dir !== root) {
+    if (import_node_fs3.default.existsSync(import_node_path2.default.join(dir, "pnpm-workspace.yaml")) || import_node_fs3.default.existsSync(import_node_path2.default.join(dir, "turbo.json")) || hasWorkspacesField(import_node_path2.default.join(dir, "package.json"))) {
+      if (dir !== projectRoot) return dir;
+    }
+    dir = import_node_path2.default.dirname(dir);
+  }
+  return null;
+}
+function hasWorkspacesField(pkgPath) {
+  try {
+    const pkg = JSON.parse(import_node_fs3.default.readFileSync(pkgPath, "utf-8"));
+    return Array.isArray(pkg.workspaces) || typeof pkg.workspaces === "object";
+  } catch {
+    return false;
+  }
+}
+function getWorkspacePatterns(monorepoRoot) {
+  const pnpmWs = import_node_path2.default.join(monorepoRoot, "pnpm-workspace.yaml");
+  if (import_node_fs3.default.existsSync(pnpmWs)) {
+    const content = import_node_fs3.default.readFileSync(pnpmWs, "utf-8");
+    const matches = content.match(/^\s*-\s*['"]?([^'"#\n]+?)['"]?\s*$/gm);
+    if (matches) {
+      return matches.map((m) => m.replace(/^\s*-\s*['"]?/, "").replace(/['"]?\s*$/, "").trim());
+    }
+  }
+  const pkgPath = import_node_path2.default.join(monorepoRoot, "package.json");
+  try {
+    const pkg = JSON.parse(import_node_fs3.default.readFileSync(pkgPath, "utf-8"));
+    const ws = pkg.workspaces;
+    if (Array.isArray(ws)) return ws;
+    if (Array.isArray(ws?.packages)) return ws.packages;
+  } catch {
+  }
+  return ["packages/*", "apps/*"];
+}
+async function loadWorkspacePackages(monorepoRoot) {
+  if (_workspaceCache) return _workspaceCache;
+  const patterns = getWorkspacePatterns(monorepoRoot);
+  const packageDirs = await (0, import_tinyglobby2.glob)(
+    patterns.map((p) => `${p}/package.json`),
+    { cwd: monorepoRoot, absolute: true }
+  );
+  const map = /* @__PURE__ */ new Map();
+  for (const pkgJsonPath of packageDirs) {
+    try {
+      const pkg = JSON.parse(import_node_fs3.default.readFileSync(pkgJsonPath, "utf-8"));
+      const pkgRoot = import_node_path2.default.dirname(pkgJsonPath);
+      const name = pkg.name;
+      if (!name) continue;
+      const entry = resolvePackageEntry(pkgRoot, pkg);
+      map.set(name, { name, root: pkgRoot, entry });
+    } catch {
+    }
+  }
+  _workspaceCache = map;
+  return map;
+}
+function resolvePackageEntry(pkgRoot, pkg) {
+  const candidates = [
+    pkg.source,
+    // unbundled source — best for monorepos
+    pkg.module,
+    pkg.main,
+    "src/index.ts",
+    "src/index.tsx",
+    "index.ts",
+    "index.tsx",
+    "src/index.js",
+    "index.js"
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    const full = import_node_path2.default.resolve(pkgRoot, candidate);
+    if (import_node_fs3.default.existsSync(full)) return full;
+  }
+  return null;
+}
+function resolveWorkspaceImport(importSource, packages) {
+  const exact = packages.get(importSource);
+  if (exact?.entry) return exact.entry;
+  for (const [name, pkg] of packages) {
+    if (importSource.startsWith(name + "/")) {
+      const subPath = importSource.slice(name.length + 1);
+      const resolved = resolveSubPath(pkg.root, subPath);
+      if (resolved) return resolved;
+    }
+  }
+  return null;
+}
+var EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs"];
+function resolveSubPath(pkgRoot, subPath) {
+  const base = import_node_path2.default.join(pkgRoot, subPath);
+  if (import_node_fs3.default.existsSync(base) && import_node_fs3.default.statSync(base).isFile()) return base;
+  for (const ext of EXTENSIONS) {
+    const candidate = base + ext;
+    if (import_node_fs3.default.existsSync(candidate)) return candidate;
+  }
+  const withSrc = import_node_path2.default.join(pkgRoot, "src", subPath);
+  for (const ext of EXTENSIONS) {
+    const candidate = withSrc + ext;
+    if (import_node_fs3.default.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+// src/resolver.ts
+var EXTENSIONS2 = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".mts"];
 var _aliases = null;
+var _workspacePackages = /* @__PURE__ */ new Map();
+function setWorkspacePackages(packages) {
+  _workspacePackages = packages;
+}
 function loadAliases(projectRoot) {
   if (_aliases) return _aliases;
   let options = {};
@@ -247,21 +368,21 @@ function loadAliases(projectRoot) {
   } catch {
     options = readTsconfigDirect(projectRoot);
   }
-  const baseUrl = options.baseUrl ? import_node_path2.default.resolve(projectRoot, options.baseUrl) : projectRoot;
+  const baseUrl = options.baseUrl ? import_node_path3.default.resolve(projectRoot, options.baseUrl) : projectRoot;
   const rawPaths = options.paths ?? {};
   const paths = {};
   for (const [key, vals] of Object.entries(rawPaths)) {
     paths[key] = vals.map(
-      (v) => import_node_path2.default.resolve(baseUrl, v.replace(/\*$/, ""))
+      (v) => import_node_path3.default.resolve(baseUrl, v.replace(/\*$/, ""))
     );
   }
   _aliases = { baseUrl, paths };
   return _aliases;
 }
 function readTsconfigDirect(projectRoot) {
-  const tsconfigPath = import_node_path2.default.join(projectRoot, "tsconfig.json");
+  const tsconfigPath = import_node_path3.default.join(projectRoot, "tsconfig.json");
   try {
-    const raw = import_node_fs3.default.readFileSync(tsconfigPath, "utf-8");
+    const raw = import_node_fs4.default.readFileSync(tsconfigPath, "utf-8");
     const stripped = raw.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
     const parsed = JSON.parse(stripped);
     return parsed.compilerOptions ?? {};
@@ -273,14 +394,14 @@ function resetAliases() {
   _aliases = null;
 }
 function resolveWithExtensions(base) {
-  if (import_node_fs3.default.existsSync(base) && import_node_fs3.default.statSync(base).isFile()) return base;
-  for (const ext of EXTENSIONS) {
+  if (import_node_fs4.default.existsSync(base) && import_node_fs4.default.statSync(base).isFile()) return base;
+  for (const ext of EXTENSIONS2) {
     const candidate = base + ext;
-    if (import_node_fs3.default.existsSync(candidate)) return candidate;
+    if (import_node_fs4.default.existsSync(candidate)) return candidate;
   }
-  for (const ext of EXTENSIONS) {
-    const candidate = import_node_path2.default.join(base, `index${ext}`);
-    if (import_node_fs3.default.existsSync(candidate)) return candidate;
+  for (const ext of EXTENSIONS2) {
+    const candidate = import_node_path3.default.join(base, `index${ext}`);
+    if (import_node_fs4.default.existsSync(candidate)) return candidate;
   }
   return null;
 }
@@ -291,14 +412,18 @@ function resolveImport(importSource, importerDir, aliases) {
       if (importSource.startsWith(aliasPrefix)) {
         const suffix = importSource.slice(aliasPrefix.length);
         for (const aliasPath of aliasPaths) {
-          const resolved = resolveWithExtensions(import_node_path2.default.join(aliasPath, suffix));
+          const resolved = resolveWithExtensions(import_node_path3.default.join(aliasPath, suffix));
           if (resolved) return resolved;
         }
       }
     }
+    if (_workspacePackages.size > 0) {
+      const wsResolved = resolveWorkspaceImport(importSource, _workspacePackages);
+      if (wsResolved) return wsResolved;
+    }
     return null;
   }
-  const absolute = import_node_path2.default.resolve(importerDir, importSource);
+  const absolute = import_node_path3.default.resolve(importerDir, importSource);
   return resolveWithExtensions(absolute);
 }
 
@@ -313,7 +438,7 @@ function buildImportGraph(files, projectRoot) {
     const sizeBytes = safeStatSize(filePath);
     nodes.set(filePath, {
       filePath,
-      displayPath: import_node_path3.default.relative(projectRoot, filePath),
+      displayPath: import_node_path4.default.relative(projectRoot, filePath),
       isClientBoundary: hasUseClient,
       isClientGraph: hasUseClient,
       // will be updated in propagation
@@ -328,7 +453,7 @@ function buildImportGraph(files, projectRoot) {
   }
   for (const [filePath, node] of nodes) {
     const rawImports = node._rawImports;
-    const importerDir = import_node_path3.default.dirname(filePath);
+    const importerDir = import_node_path4.default.dirname(filePath);
     const resolvedImports = [];
     for (const importSource of rawImports) {
       const resolved = resolveImport(importSource, importerDir, aliases);
@@ -383,18 +508,18 @@ function propagateClientGraph(graph) {
 }
 function safeStatSize(filePath) {
   try {
-    return import_node_fs4.default.statSync(filePath).size;
+    return import_node_fs5.default.statSync(filePath).size;
   } catch {
     return 0;
   }
 }
 function isBarrelFile(filePath) {
-  const base = import_node_path3.default.basename(filePath, import_node_path3.default.extname(filePath));
+  const base = import_node_path4.default.basename(filePath, import_node_path4.default.extname(filePath));
   return base === "index";
 }
 function getBarrelExports(barrelPath, aliases, nodes) {
   const { imports } = parseFile(barrelPath);
-  const barrelDir = import_node_path3.default.dirname(barrelPath);
+  const barrelDir = import_node_path4.default.dirname(barrelPath);
   const result = [];
   for (const importSource of imports) {
     const resolved = resolveImport(importSource, barrelDir, aliases);
@@ -507,7 +632,15 @@ function buildAnalysisResult(graph, projectRoot) {
 // src/index.ts
 async function analyze(dir = ".") {
   resetAliases();
+  resetWorkspaceCache();
   const projectRoot = resolveProjectRoot(dir);
+  const monorepoRoot = findMonorepoRoot(projectRoot);
+  if (monorepoRoot) {
+    const packages = await loadWorkspacePackages(monorepoRoot);
+    setWorkspacePackages(packages);
+  } else {
+    setWorkspacePackages(/* @__PURE__ */ new Map());
+  }
   const files = await collectSourceFiles(projectRoot);
   const graph = buildImportGraph(files, projectRoot);
   propagateClientGraph(graph);

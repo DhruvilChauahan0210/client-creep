@@ -1,0 +1,66 @@
+name: client-creep
+description: Analyze Next.js client component boundaries — find accidental creep and bundle cost
+author: DhruvilChauahan0210
+
+branding:
+  icon: zap
+  color: yellow
+
+inputs:
+  dir:
+    description: Path to the Next.js project (relative to repo root)
+    required: false
+    default: "."
+  budget:
+    description: Fail if estimated client JS exceeds this KB threshold
+    required: false
+    default: ""
+  ci:
+    description: Fail if any accidental creep candidates are detected
+    required: false
+    default: "true"
+  version:
+    description: Version of client-creep to use
+    required: false
+    default: "latest"
+
+outputs:
+  client-components:
+    description: Number of client components found
+  boundaries:
+    description: Number of use-client boundaries found
+  creep-candidates:
+    description: Number of accidental creep candidates
+  estimated-kb:
+    description: Estimated client JS in KB
+  recoverable-kb:
+    description: Estimated recoverable KB from creep candidates
+
+runs:
+  using: composite
+  steps:
+    - name: Run client-creep
+      shell: bash
+      run: |
+        ARGS="${{ inputs.dir }}"
+        if [ "${{ inputs.ci }}" = "true" ]; then
+          ARGS="$ARGS --ci"
+        fi
+        if [ -n "${{ inputs.budget }}" ]; then
+          ARGS="$ARGS --budget ${{ inputs.budget }}"
+        fi
+
+        # Run and capture JSON output for outputs
+        JSON=$(npx --yes client-creep@${{ inputs.version }} $ARGS --json 2>/dev/null || true)
+
+        # Also run for human-readable output
+        npx --yes client-creep@${{ inputs.version }} $ARGS
+
+        # Set outputs
+        if [ -n "$JSON" ]; then
+          echo "client-components=$(echo $JSON | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8'));process.stdout.write(String(d.summary.clientComponents))")" >> $GITHUB_OUTPUT
+          echo "boundaries=$(echo $JSON | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8'));process.stdout.write(String(d.summary.clientBoundaries))")" >> $GITHUB_OUTPUT
+          echo "creep-candidates=$(echo $JSON | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8'));process.stdout.write(String(d.summary.creepCandidates))")" >> $GITHUB_OUTPUT
+          echo "estimated-kb=$(echo $JSON | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8'));process.stdout.write((d.summary.estimatedClientBytes/1024).toFixed(0))")" >> $GITHUB_OUTPUT
+          echo "recoverable-kb=$(echo $JSON | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8'));process.stdout.write((d.summary.recoverableBytes/1024).toFixed(0))")" >> $GITHUB_OUTPUT
+        fi

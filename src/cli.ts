@@ -1,7 +1,10 @@
 import { cac } from "cac";
 import pc from "picocolors";
+import path from "node:path";
 import { analyze } from "./index.js";
 import { renderTerminal, renderJson } from "./render.js";
+import { renderHtml } from "./render-html.js";
+import { runWatch } from "./watch.js";
 
 const cli = cac("client-creep");
 
@@ -9,21 +12,51 @@ cli
   .command("[dir]", "Analyze a Next.js project for client component creep")
   .option("--dir <path>", "Path to the Next.js project (alias for positional arg)")
   .option("--json", "Output results as JSON")
+  .option("--html [file]", "Write an interactive HTML report (default: client-creep-report.html)")
+  .option("--watch", "Watch for file changes and re-run analysis")
   .option("--ci", "CI mode: exit 1 if client creep is detected")
   .option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold")
-  .action(async (dir: string = ".", options: { dir?: string; json?: boolean; ci?: boolean; budget?: string }) => {
+  .action(async (
+    dir: string = ".",
+    options: {
+      dir?: string;
+      json?: boolean;
+      html?: boolean | string;
+      watch?: boolean;
+      ci?: boolean;
+      budget?: string;
+    }
+  ) => {
     const targetDir = options.dir ?? dir ?? ".";
 
+    // Watch mode — hand off entirely
+    if (options.watch) {
+      await runWatch(path.resolve(targetDir));
+      return;
+    }
+
     try {
-      if (!options.json) {
+      if (!options.json && !options.html) {
         process.stdout.write(pc.dim("  Scanning…\r"));
       }
 
       const result = await analyze(targetDir);
 
+      // HTML report
+      if (options.html !== undefined && options.html !== false) {
+        const outFile = typeof options.html === "string"
+          ? options.html
+          : "client-creep-report.html";
+        renderHtml(result, outFile);
+        if (!options.json) {
+          console.log(pc.green(`  ✓ HTML report written to ${outFile}`));
+        }
+      }
+
+      // Terminal or JSON output
       if (options.json) {
         renderJson(result);
-      } else {
+      } else if (!options.html) {
         renderTerminal(result);
       }
 
@@ -67,5 +100,5 @@ cli
   });
 
 cli.help();
-cli.version("0.1.0");
+cli.version("0.1.2");
 cli.parse();
