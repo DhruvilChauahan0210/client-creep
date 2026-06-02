@@ -1,0 +1,9 @@
+src/
+fixtures/
+*.tape
+demo.gif
+tsconfig.json
+tsup.config.ts
+.github/
+*.md
+!README.md

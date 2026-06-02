@@ -1,0 +1,58 @@
+{
+  "name": "client-creep",
+  "version": "0.1.0",
+  "description": "Find out why your Next.js components are client components — and what they cost you",
+  "type": "module",
+  "bin": {
+    "client-creep": "dist/cli.js"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "nextjs",
+    "react-server-components",
+    "rsc",
+    "client-components",
+    "bundle-analysis",
+    "performance",
+    "cli"
+  ],
+  "author": "Dhruvil",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.24.0",
+    "@babel/traverse": "^7.24.0",
+    "cac": "^6.7.14",
+    "get-tsconfig": "^4.7.5",
+    "picocolors": "^1.0.1",
+    "tinyglobby": "^0.2.6"
+  },
+  "devDependencies": {
+    "@babel/types": "^7.24.0",
+    "@types/babel__traverse": "^7.20.6",
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}
