@@ -1,6 +1,6 @@
 {
   "name": "client-creep",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Find out why your Next.js components are client components — and what they cost you",
   "type": "module",
   "bin": {
