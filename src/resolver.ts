@@ -4,7 +4,7 @@ import { getTsconfig } from "get-tsconfig";
 
 const EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".mts"];
 
-interface TsPathAliases {
+export interface TsPathAliases {
   baseUrl: string;
   paths: Record<string, string[]>;
 }

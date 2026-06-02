@@ -2,7 +2,7 @@ import path from "node:path";
 import fs from "node:fs";
 import type { ComponentNode, ImportGraph } from "./types.js";
 import { parseFile } from "./parser.js";
-import { resolveImport, loadAliases } from "./resolver.js";
+import { resolveImport, loadAliases, type TsPathAliases } from "./resolver.js";
 
 export function buildImportGraph(
   files: string[],
@@ -45,11 +45,26 @@ export function buildImportGraph(
 
     for (const importSource of rawImports) {
       const resolved = resolveImport(importSource, importerDir, aliases);
-      if (resolved && nodes.has(resolved)) {
+      if (!resolved) continue;
+
+      if (nodes.has(resolved)) {
         resolvedImports.push(resolved);
         edges.get(filePath)!.add(resolved);
         if (!reverseEdges.has(resolved)) reverseEdges.set(resolved, new Set());
         reverseEdges.get(resolved)!.add(filePath);
+
+        // If the resolved file is a barrel (index.*), also wire edges to
+        // everything it re-exports so propagation follows through barrels
+        if (isBarrelFile(resolved)) {
+          const barrelExports = getBarrelExports(resolved, aliases, nodes);
+          for (const exported of barrelExports) {
+            if (!edges.get(filePath)!.has(exported)) {
+              edges.get(filePath)!.add(exported);
+              if (!reverseEdges.has(exported)) reverseEdges.set(exported, new Set());
+              reverseEdges.get(exported)!.add(filePath);
+            }
+          }
+        }
       }
     }
 
@@ -100,4 +115,28 @@ function safeStatSize(filePath: string): number {
   } catch {
     return 0;
   }
+}
+
+function isBarrelFile(filePath: string): boolean {
+  const base = path.basename(filePath, path.extname(filePath));
+  return base === "index";
+}
+
+function getBarrelExports(
+  barrelPath: string,
+  aliases: TsPathAliases,
+  nodes: Map<string, ComponentNode>
+): string[] {
+  const { imports } = parseFile(barrelPath);
+  const barrelDir = path.dirname(barrelPath);
+  const result: string[] = [];
+
+  for (const importSource of imports) {
+    const resolved = resolveImport(importSource, barrelDir, aliases);
+    if (resolved && nodes.has(resolved)) {
+      result.push(resolved);
+    }
+  }
+
+  return result;
 }

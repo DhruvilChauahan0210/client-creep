@@ -324,11 +324,22 @@ function buildImportGraph(files, projectRoot) {
     const resolvedImports = [];
     for (const importSource of rawImports) {
       const resolved = resolveImport(importSource, importerDir, aliases);
-      if (resolved && nodes.has(resolved)) {
+      if (!resolved) continue;
+      if (nodes.has(resolved)) {
         resolvedImports.push(resolved);
         edges.get(filePath).add(resolved);
         if (!reverseEdges.has(resolved)) reverseEdges.set(resolved, /* @__PURE__ */ new Set());
         reverseEdges.get(resolved).add(filePath);
+        if (isBarrelFile(resolved)) {
+          const barrelExports = getBarrelExports(resolved, aliases, nodes);
+          for (const exported of barrelExports) {
+            if (!edges.get(filePath).has(exported)) {
+              edges.get(filePath).add(exported);
+              if (!reverseEdges.has(exported)) reverseEdges.set(exported, /* @__PURE__ */ new Set());
+              reverseEdges.get(exported).add(filePath);
+            }
+          }
+        }
       }
     }
     node.imports = resolvedImports;
@@ -368,6 +379,22 @@ function safeStatSize(filePath) {
   } catch {
     return 0;
   }
+}
+function isBarrelFile(filePath) {
+  const base = import_node_path3.default.basename(filePath, import_node_path3.default.extname(filePath));
+  return base === "index";
+}
+function getBarrelExports(barrelPath, aliases, nodes) {
+  const { imports } = parseFile(barrelPath);
+  const barrelDir = import_node_path3.default.dirname(barrelPath);
+  const result = [];
+  for (const importSource of imports) {
+    const resolved = resolveImport(importSource, barrelDir, aliases);
+    if (resolved && nodes.has(resolved)) {
+      result.push(resolved);
+    }
+  }
+  return result;
 }
 
 // src/analyze.ts
@@ -664,8 +691,8 @@ function renderJson(result) {
 
 // src/cli.ts
 var cli = (0, import_cac.cac)("client-creep");
-cli.command("[dir]", "Analyze a Next.js project for client component creep").option("--json", "Output results as JSON").option("--ci", "CI mode: exit 1 if client creep is detected").option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold").action(async (dir = ".", options) => {
-  const targetDir = dir ?? ".";
+cli.command("[dir]", "Analyze a Next.js project for client component creep").option("--dir <path>", "Path to the Next.js project (alias for positional arg)").option("--json", "Output results as JSON").option("--ci", "CI mode: exit 1 if client creep is detected").option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold").action(async (dir = ".", options) => {
+  const targetDir = options.dir ?? dir ?? ".";
   try {
     if (!options.json) {
       process.stdout.write(import_picocolors2.default.dim("  Scanning\u2026\r"));
@@ -678,29 +705,32 @@ cli.command("[dir]", "Analyze a Next.js project for client component creep").opt
     }
     if (options.ci || options.budget) {
       const budgetKb = options.budget ? Number(options.budget) : void 0;
+      let failed = false;
       if (budgetKb !== void 0) {
         const actualKb = result.totalClientBytes / 1024;
         if (actualKb > budgetKb) {
+          failed = true;
           if (!options.json) {
-            console.error(
-              import_picocolors2.default.red(
-                `  \u2717 Budget exceeded: ${actualKb.toFixed(1)} KB client JS > ${budgetKb} KB limit`
-              )
-            );
+            console.error(import_picocolors2.default.red(`
+  \u2717 client-creep: budget exceeded`));
+            console.error(import_picocolors2.default.red(`    ${actualKb.toFixed(1)} KB client JS > ${budgetKb} KB limit`));
+            console.error(import_picocolors2.default.dim(`    Run without --ci to see the full report and where to recover KB.`));
           }
-          process.exit(1);
         }
       }
       if (options.ci && result.creepCandidates.length > 0) {
+        failed = true;
         if (!options.json) {
-          console.error(
-            import_picocolors2.default.red(
-              `  \u2717 ${result.creepCandidates.length} accidental client creep candidates detected`
-            )
-          );
+          console.error(import_picocolors2.default.red(`
+  \u2717 client-creep: ${result.creepCandidates.length} accidental creep candidates found`));
+          console.error(import_picocolors2.default.dim(`    ~${(result.recoverableBytes / 1024).toFixed(0)} KB potentially recoverable.`));
+          console.error(import_picocolors2.default.dim(`    Run without --ci to see the full report.`));
         }
-        process.exit(1);
       }
+      if (!failed && !options.json) {
+        console.log(import_picocolors2.default.green(`  \u2713 client-creep: no issues found`));
+      }
+      if (failed) process.exit(1);
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

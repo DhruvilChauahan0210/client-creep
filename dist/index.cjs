@@ -332,11 +332,22 @@ function buildImportGraph(files, projectRoot) {
     const resolvedImports = [];
     for (const importSource of rawImports) {
       const resolved = resolveImport(importSource, importerDir, aliases);
-      if (resolved && nodes.has(resolved)) {
+      if (!resolved) continue;
+      if (nodes.has(resolved)) {
         resolvedImports.push(resolved);
         edges.get(filePath).add(resolved);
         if (!reverseEdges.has(resolved)) reverseEdges.set(resolved, /* @__PURE__ */ new Set());
         reverseEdges.get(resolved).add(filePath);
+        if (isBarrelFile(resolved)) {
+          const barrelExports = getBarrelExports(resolved, aliases, nodes);
+          for (const exported of barrelExports) {
+            if (!edges.get(filePath).has(exported)) {
+              edges.get(filePath).add(exported);
+              if (!reverseEdges.has(exported)) reverseEdges.set(exported, /* @__PURE__ */ new Set());
+              reverseEdges.get(exported).add(filePath);
+            }
+          }
+        }
       }
     }
     node.imports = resolvedImports;
@@ -376,6 +387,22 @@ function safeStatSize(filePath) {
   } catch {
     return 0;
   }
+}
+function isBarrelFile(filePath) {
+  const base = import_node_path3.default.basename(filePath, import_node_path3.default.extname(filePath));
+  return base === "index";
+}
+function getBarrelExports(barrelPath, aliases, nodes) {
+  const { imports } = parseFile(barrelPath);
+  const barrelDir = import_node_path3.default.dirname(barrelPath);
+  const result = [];
+  for (const importSource of imports) {
+    const resolved = resolveImport(importSource, barrelDir, aliases);
+    if (resolved && nodes.has(resolved)) {
+      result.push(resolved);
+    }
+  }
+  return result;
 }
 
 // src/analyze.ts
