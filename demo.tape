@@ -11,47 +11,37 @@ Set WindowBar Rings
 Set TypingSpeed 60ms
 Set PlaybackSpeed 1
 
-# Navigate to dub silently
 Hide
 Type "cd /tmp/dub/apps/web && clear"
 Enter
 Sleep 500ms
 Show
 
-# Pause before typing
 Sleep 800ms
 
-# Type the magic command
+# Scene 1: basic run — shocking summary
 Type "npx client-creep"
-Sleep 1s
+Sleep 800ms
 Enter
-
-# Wait for full output to render
 Sleep 4s
 
-# Hold on summary numbers — the most shocking part
+# Hold on summary numbers
 Sleep 2.5s
 
-# Scroll down slowly through boundaries
+# Scroll through boundaries
 ScrollDown 3
-Sleep 600ms
+Sleep 500ms
 ScrollDown 3
-Sleep 600ms
+Sleep 500ms
 ScrollDown 3
-Sleep 600ms
+Sleep 500ms
 ScrollDown 3
-Sleep 600ms
-ScrollDown 3
-Sleep 600ms
-ScrollDown 3
-Sleep 600ms
+Sleep 500ms
 
-# Pause on the boundary section
+# Hold on a boundary with its deps
 Sleep 1.5s
 
-# Scroll to the creep section
-ScrollDown 5
-Sleep 400ms
+# Scroll to creep section
 ScrollDown 5
 Sleep 400ms
 ScrollDown 5
@@ -61,5 +51,27 @@ Sleep 400ms
 ScrollDown 5
 Sleep 400ms
 
-# Hold on a "why" trace — the signature feature
-Sleep 3s
+# Hold on a "why" trace
+Sleep 2.5s
+
+# Scene 2: --html flag
+Hide
+Type "clear"
+Enter
+Sleep 300ms
+Show
+
+Sleep 600ms
+Type "npx client-creep --html report.html"
+Sleep 800ms
+Enter
+Sleep 4s
+
+# Hold on the success message
+Sleep 2s
+
+# Open the file
+Type "open report.html"
+Sleep 500ms
+Enter
+Sleep 2s

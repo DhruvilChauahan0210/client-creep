@@ -35,10 +35,10 @@ Running on a real 534-file Next.js app:
   client-creep  Next.js client component analysis
 ────────────────────────────────────────────────────────────
 
-  Project:              /your-next-app
-  Files scanned:        534
-  Client components:    418  (182 boundaries)
-  Estimated client JS:  2.29 MB  (estimate — raw source bytes)
+  Project:                  /your-next-app
+  Files scanned:            534
+  Client components:        418  (182 boundaries)
+  Estimated client JS:      2.29 MB  (estimate — raw source bytes)
   Potentially recoverable:  237.4 KB  (113 creep candidates)
 
 ────────────────────────────────────────────────────────────
@@ -48,11 +48,7 @@ Running on a real 534-file Next.js app:
   ⚡ src/app/home/Home.tsx  signals: useRouter, useState, useEffect, useUser
      └─ src/hooks/use-classrooms.ts
      └─ src/hooks/use-people.ts
-     └─ src/hooks/use-user.ts
      └─ … and 7 more
-
-  ⚡ src/context/file-explorer-context.tsx  signals: useState, useCallback, useContext
-     └─ src/lib/graphql/files/types/types.ts
 
 ────────────────────────────────────────────────────────────
   ⚠  Accidental Client Creep  — components that may not need to be client
@@ -64,12 +60,6 @@ Running on a real 534-file Next.js app:
     ⚡ src/app/chat-insights/page.tsx ← use client
       └─ src/app/chat-insights/components/index.ts
            └─ src/app/chat-insights/components/EmptyStates.tsx
-
-  ⚠ src/design-system/foundations/typography.ts  5.7 KB potentially recoverable
-    No client-only signals detected (no hooks, event handlers, or browser APIs)
-    Why client:
-    ⚡ src/app/gradebook/page.tsx ← use client
-      └─ src/design-system/foundations/typography.ts
 ```
 
 ---
@@ -102,6 +92,12 @@ npx client-creep
 # Scan a specific project
 npx client-creep ./path/to/next-app
 
+# Interactive HTML report — open in browser, share with your team
+npx client-creep --html
+
+# Watch mode — re-runs on every file save
+npx client-creep --watch
+
 # JSON output (for scripts, CI, tooling)
 npx client-creep --json
 
@@ -109,7 +105,7 @@ npx client-creep --json
 npx client-creep --ci
 
 # Fail CI if estimated client JS exceeds a size budget
-npx client-creep --budget 500   # fail if > 500 KB
+npx client-creep --budget 500
 ```
 
 ### Flags
@@ -117,43 +113,75 @@ npx client-creep --budget 500   # fail if > 500 KB
 | Flag | Description |
 |---|---|
 | `[dir]` | Path to the Next.js project (default: `.`) |
+| `--dir <path>` | Named alias for the project path |
+| `--html [file]` | Write an interactive HTML graph report (default: `client-creep-report.html`) |
+| `--watch` | Re-run analysis on every file save |
 | `--json` | Output results as JSON |
 | `--ci` | Exit code 1 if creep candidates are found |
 | `--budget <kb>` | Exit code 1 if estimated client JS exceeds this KB |
 
 ---
 
-## What it detects
+## Interactive HTML report
 
-**Client boundary roots** — files with a `"use client"` directive, showing:
-- Which client-only signals justified the boundary (`useState`, `useEffect`, `onClick`, `window`, `@apollo/client`, `@radix-ui/*`, etc.)
-- Which files were pulled into the client graph as a result
+```bash
+npx client-creep --html
+# → writes client-creep-report.html
+```
 
-**Accidental creep candidates** — files that are in the client graph but have _no client-only signals_ of their own. These are candidates to hoist back to server components (or pass as `children` props).
+Opens a D3 force-directed graph of your entire import graph, color-coded by component type:
 
-**The "why" trace** — for every accidental creep candidate, the exact import chain from the `"use client"` boundary to that file. No more guessing.
+- **Amber** — `"use client"` boundary roots
+- **Red** — accidental creep candidates (no client signals)
+- **Orange** — client components (transitive)
+- **Blue** — server components
 
-**Size estimates** — total estimated client JS and how much is potentially recoverable. Labeled as estimates (raw source bytes — run `@next/bundle-analyzer` for exact bundle impact).
+Click any node to see its client signals, "why" import chain, and file size in the sidebar. Filter by boundaries, creep candidates, or search by filename.
 
 ---
 
 ## CI usage
 
-Add to your GitHub Actions workflow:
+### Option 1 — inline step
 
 ```yaml
 - name: Check for client creep
   run: npx client-creep --ci --budget 1000
 ```
 
-Exits 1 if:
-- `--ci`: any accidental creep candidates are detected
-- `--budget <kb>`: estimated client JS exceeds the threshold
+### Option 2 — GitHub Action
 
-Use `--json` to pipe results into other tools:
+```yaml
+- uses: DhruvilChauahan0210/client-creep@main
+  with:
+    ci: true
+    budget: 500   # fail if > 500 KB client JS
+```
+
+**Action inputs:**
+
+| Input | Description | Default |
+|---|---|---|
+| `dir` | Path to the Next.js project | `.` |
+| `ci` | Fail on creep candidates | `true` |
+| `budget` | Max client JS in KB | — |
+| `version` | client-creep version to use | `latest` |
+
+**Action outputs:** `client-components`, `boundaries`, `creep-candidates`, `estimated-kb`, `recoverable-kb`
+
+Exits 1 if:
+- `--ci` / `ci: true` — any accidental creep candidates are detected
+- `--budget <kb>` — estimated client JS exceeds the threshold
+
+---
+
+## Monorepo support
+
+`client-creep` auto-detects monorepo roots via `pnpm-workspace.yaml`, `turbo.json`, or `package.json` workspaces. Cross-package imports (`@acme/ui`, `@acme/utils`) are resolved to their source files automatically — no config needed.
 
 ```bash
-npx client-creep --json | jq '.summary'
+# Run from any app in a monorepo
+npx client-creep ./apps/web
 ```
 
 ---
@@ -164,13 +192,13 @@ npx client-creep --json | jq '.summary'
 
 1. Globs all `.ts/.tsx/.js/.jsx` files (respects `.next/`, `node_modules/`, `dist/` ignores)
 2. Parses each file with a Babel AST — detects `"use client"` directives and extracts imports
-3. Resolves imports to absolute paths, including `tsconfig.json` path aliases (`@/*`, etc.)
+3. Resolves imports to absolute paths, including `tsconfig.json` path aliases and monorepo workspace packages
 4. Builds a directed import graph and propagates the client boundary via BFS
 5. For each client node, computes the shortest import path back to its `"use client"` root
 6. Flags nodes with no detected client signals as accidental creep candidates
-7. Renders the terminal report (or JSON)
+7. Renders the terminal report, JSON, or interactive HTML graph
 
-**Client signal detection covers:** React hooks (`useState`, `useEffect`, and any `use[A-Z]*` hook — including third-party like `useMutation`, `useQuery`), event handler props (`onClick`, `onChange`, etc.), browser globals (`window`, `document`, `localStorage`, etc.), `dynamic({ssr: false})`, and known client-only packages (`@radix-ui/*`, `@apollo/client`, `framer-motion`, `sonner`, and more).
+**Client signal detection covers:** React hooks (`useState`, `useEffect`, and any `use[A-Z]*` hook — including third-party like `useMutation`, `useQuery`), `React.useXxx()` namespaced calls, event handler props (`onClick`, `onChange`, etc.), browser globals (`window`, `document`, `localStorage`, etc.), `dynamic({ssr: false})`, and known client-only packages (`@radix-ui/*`, `@apollo/client`, `framer-motion`, `sonner`, and more).
 
 ---
 
@@ -184,33 +212,28 @@ npx client-creep --json | jq '.summary'
 | "Why is this client?" | ❌ | ❌ | ✅ **full import chain trace** |
 | "Did it need to be?" | ❌ | partial | ✅ **accidental creep detection** |
 | "What does it cost?" | ❌ | ❌ | ✅ **estimated KB per boundary** |
+| Interactive graph | ❌ | ❌ | ✅ **`--html` D3 force graph** |
+| Watch mode | ❌ | ❌ | ✅ **`--watch`** |
 | CI / exit codes | ❌ | weak | ✅ `--ci` + `--budget` |
+| Monorepo support | ❌ | ❌ | ✅ **pnpm/turbo/yarn workspaces** |
 | Works without running the app | ❌ | ✅ | ✅ |
-
-`rsc-boundary` has a beautiful live overlay — if you're on Next 16 and want to see boundaries paint on your running page, it's great. `client-creep` is for when you want to understand _why_ the boundary is there and what it's costing you, in one command, on any Next version.
 
 ---
 
-## Limitations (v0.1)
+## Limitations
 
 - **Static analysis approximates the real bundler graph.** Dynamic `import()`, conditional `"use client"`, and tree-shaking aren't modeled. Treat size numbers as estimates.
-- **Barrel files** (`index.ts` re-exporting many modules) may miss some transitive edges.
-- **Monorepo workspace imports** are not resolved (v0.2).
 - Signals called through abstraction layers (e.g. a helper that internally calls `localStorage`) won't be detected without following the full call graph.
+- `--html` graph requires an internet connection to load D3 from CDN.
 
 ---
 
 ## Roadmap
 
-**v0.2 (coming soon)**
-- `--html` — interactive boundary graph (D3 force graph, shareable)
-- GitHub Action with PR comment ("client creep +40KB in this PR")
-- Barrel file + monorepo resolution
-- `--watch` mode
-
 **v0.3+**
 - ESLint plugin (`eslint-plugin-client-creep`) for inline editor warnings
 - Hosted dashboard — track creep trend over time per repo
+- VS Code extension
 
 ---
 
