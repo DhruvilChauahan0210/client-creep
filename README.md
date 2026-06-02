@@ -8,7 +8,7 @@ npx client-creep
 
 > _"You have client creep. Here's the cure."_
 
-![client-creep demo](demo.gif)
+![client-creep demo](https://raw.githubusercontent.com/DhruvilChauahan0210/client-creep/main/demo.gif)
 
 ---
 
