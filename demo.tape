@@ -11,40 +11,35 @@ Set WindowBar Rings
 Set TypingSpeed 60ms
 Set PlaybackSpeed 1
 
+# ── Setup ──────────────────────────────────────────────────
 Hide
 Type "cd /tmp/dub/apps/web && clear"
 Enter
-Sleep 500ms
+Sleep 300ms
 Show
 
-Sleep 800ms
-
-# Scene 1: basic run — shocking summary
+# ── Scene 1: basic run ─────────────────────────────────────
+Sleep 600ms
 Type "npx client-creep"
-Sleep 800ms
+Sleep 700ms
 Enter
 Sleep 4s
 
-# Hold on summary numbers
+# Hold on summary — the shocking numbers
 Sleep 2.5s
 
-# Scroll through boundaries
-ScrollDown 3
+# Scroll through boundaries + creep section
+ScrollDown 4
 Sleep 500ms
-ScrollDown 3
+ScrollDown 4
 Sleep 500ms
-ScrollDown 3
+ScrollDown 4
 Sleep 500ms
-ScrollDown 3
+ScrollDown 4
 Sleep 500ms
-
-# Hold on a boundary with its deps
-Sleep 1.5s
-
-# Scroll to creep section
-ScrollDown 5
+ScrollDown 4
 Sleep 400ms
-ScrollDown 5
+ScrollDown 4
 Sleep 400ms
 ScrollDown 5
 Sleep 400ms
@@ -52,26 +47,42 @@ ScrollDown 5
 Sleep 400ms
 
 # Hold on a "why" trace
-Sleep 2.5s
+Sleep 2s
 
-# Scene 2: --html flag
+# ── Scene 2: --html ────────────────────────────────────────
 Hide
 Type "clear"
 Enter
-Sleep 300ms
+Sleep 200ms
 Show
 
-Sleep 600ms
+Sleep 500ms
 Type "npx client-creep --html report.html"
-Sleep 800ms
+Sleep 700ms
 Enter
 Sleep 4s
 
-# Hold on the success message
-Sleep 2s
+# Hold on the ✓ success line
+Sleep 2.5s
 
-# Open the file
-Type "open report.html"
-Sleep 500ms
+# ── Scene 3: --watch ───────────────────────────────────────
+Hide
+Type "clear"
 Enter
-Sleep 2s
+Sleep 200ms
+Show
+
+Sleep 500ms
+Type "npx client-creep --watch"
+Sleep 700ms
+Enter
+
+# Wait for first scan
+Sleep 4.5s
+
+# Hold on the output + "Watching for changes…" line
+Sleep 3s
+
+# Exit watch mode
+Ctrl+C
+Sleep 800ms
