@@ -5,17 +5,23 @@ import { analyze } from "./index.js";
 import { renderTerminal, renderJson } from "./render.js";
 import { renderHtml } from "./render-html.js";
 import { runWatch } from "./watch.js";
+import { pushToDashboard } from "./push.js";
 
 const cli = cac("client-creep");
 
 cli
   .command("[dir]", "Analyze a Next.js project for client component creep")
-  .option("--dir <path>", "Path to the Next.js project (alias for positional arg)")
-  .option("--json", "Output results as JSON")
-  .option("--html [file]", "Write an interactive HTML report (default: client-creep-report.html)")
-  .option("--watch", "Watch for file changes and re-run analysis")
-  .option("--ci", "CI mode: exit 1 if client creep is detected")
-  .option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold")
+  .option("--dir <path>",       "Path to the Next.js project (alias for positional arg)")
+  .option("--json",             "Output results as JSON")
+  .option("--html [file]",      "Write an interactive HTML report (default: client-creep-report.html)")
+  .option("--watch",            "Watch for file changes and re-run analysis")
+  .option("--ci",               "CI mode: exit 1 if client creep is detected")
+  .option("--budget <kb>",      "Fail CI if estimated client JS exceeds this KB threshold")
+  .option("--push",             "Push results to the client-creep dashboard")
+  .option("--token <token>",    "Supabase access token for --push (get from dashboard → Settings)")
+  .option("--dashboard <url>",  "Dashboard URL (default: https://client-creep-dashboard.vercel.app)")
+  .option("--owner <owner>",    "Repo owner override for --push (default: auto-detected from git remote)")
+  .option("--repo <name>",      "Repo name override for --push (default: auto-detected from git remote)")
   .action(async (
     dir: string = ".",
     options: {
@@ -25,6 +31,11 @@ cli
       watch?: boolean;
       ci?: boolean;
       budget?: string;
+      push?: boolean;
+      token?: string;
+      dashboard?: string;
+      owner?: string;
+      repo?: string;
     }
   ) => {
     const targetDir = options.dir ?? dir ?? ".";
@@ -35,12 +46,23 @@ cli
       return;
     }
 
+    // Validate --push requires --token
+    if (options.push && !options.token) {
+      console.error(pc.red("  Error: --push requires --token"));
+      console.error(pc.dim("  Get your token from the dashboard → Settings → Access Token"));
+      console.error(pc.dim("  Usage: npx client-creep --push --token <your-token>"));
+      process.exit(1);
+    }
+
     try {
-      if (!options.json && !options.html) {
+      const showSpinner = !options.json && !options.html;
+      if (showSpinner) {
         process.stdout.write(pc.dim("  Scanning…\r"));
       }
 
+      const scanStart = Date.now();
       const result = await analyze(targetDir);
+      const scanDurationMs = Date.now() - scanStart;
 
       // HTML report
       if (options.html !== undefined && options.html !== false) {
@@ -58,6 +80,35 @@ cli
         renderJson(result);
       } else if (!options.html) {
         renderTerminal(result);
+      }
+
+      // Push to dashboard
+      if (options.push && options.token) {
+        if (!options.json) {
+          process.stdout.write(pc.dim("  Pushing to dashboard…\r"));
+        }
+
+        const pushResult = await pushToDashboard(
+          result,
+          {
+            token:        options.token,
+            dashboardUrl: options.dashboard,
+            owner:        options.owner,
+            repo:         options.repo,
+          },
+          scanDurationMs
+        );
+
+        if (!options.json) {
+          if (pushResult.ok) {
+            console.log(pc.green(`  ✓ Pushed to dashboard`));
+            if (pushResult.dashboardUrl) {
+              console.log(pc.dim(`    ${pushResult.dashboardUrl}`));
+            }
+          } else {
+            console.error(pc.red(`  ✗ Push failed: ${pushResult.error}`));
+          }
+        }
       }
 
       // CI exit code logic

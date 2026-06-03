@@ -27,6 +27,18 @@ inputs:
     description: Post a summary comment on pull requests
     required: false
     default: "true"
+  push:
+    description: Push results to the client-creep dashboard
+    required: false
+    default: "false"
+  token:
+    description: Supabase access token for pushing to the dashboard
+    required: false
+    default: ""
+  dashboard:
+    description: Dashboard URL (default is the hosted dashboard)
+    required: false
+    default: ""
 
 outputs:
   client-components:
@@ -53,6 +65,12 @@ runs:
         fi
         if [ -n "${{ inputs.budget }}" ]; then
           ARGS="$ARGS --budget ${{ inputs.budget }}"
+        fi
+        if [ "${{ inputs.push }}" = "true" ] && [ -n "${{ inputs.token }}" ]; then
+          ARGS="$ARGS --push --token ${{ inputs.token }}"
+        fi
+        if [ -n "${{ inputs.dashboard }}" ]; then
+          ARGS="$ARGS --dashboard ${{ inputs.dashboard }}"
         fi
 
         CC_JSON_FILE="$RUNNER_TEMP/client-creep-output.json"

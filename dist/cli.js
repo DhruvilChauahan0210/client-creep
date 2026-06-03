@@ -3,14 +3,19 @@ import {
   analyze,
   resetAliases,
   resetWorkspaceCache
-} from "./chunk-XV522M5T.js";
+} from "./chunk-6S57V4DS.js";
+import {
+  init_esm_shims
+} from "./chunk-STPGDZXW.js";
 
 // src/cli.ts
+init_esm_shims();
 import { cac } from "cac";
 import pc3 from "picocolors";
-import path3 from "path";
+import path4 from "path";
 
 // src/render.ts
+init_esm_shims();
 import pc from "picocolors";
 import path from "path";
 function formatBytes(bytes) {
@@ -194,6 +199,7 @@ function renderJson(result) {
 }
 
 // src/render-html.ts
+init_esm_shims();
 import fs from "fs";
 import path2 from "path";
 function formatBytes2(bytes) {
@@ -557,6 +563,7 @@ window.addEventListener('resize', render);
 }
 
 // src/watch.ts
+init_esm_shims();
 import fs2 from "fs";
 import pc2 from "picocolors";
 async function runWatch(targetDir) {
@@ -601,19 +608,110 @@ async function runWatch(targetDir) {
   });
 }
 
+// src/push.ts
+init_esm_shims();
+import path3 from "path";
+async function detectRepoFromGit(projectRoot) {
+  try {
+    const { execa } = await import("./execa-MNBESVMJ.js");
+    const { stdout } = await execa("git", ["remote", "get-url", "origin"], { cwd: projectRoot });
+    const url = stdout.trim();
+    const sshMatch = url.match(/git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/);
+    if (sshMatch) return { owner: sshMatch[1], name: sshMatch[2] };
+    const httpsMatch = url.match(/github\.com\/([^/]+)\/(.+?)(?:\.git)?$/);
+    if (httpsMatch) return { owner: httpsMatch[1], name: httpsMatch[2] };
+  } catch {
+  }
+  return null;
+}
+async function pushToDashboard(result, options, scanDurationMs) {
+  const dashboardUrl = (options.dashboardUrl ?? "https://client-creep-dashboard.vercel.app").replace(/\/$/, "");
+  let owner = options.owner;
+  let repoName = options.repo;
+  if (!owner || !repoName) {
+    const detected = await detectRepoFromGit(result.projectRoot);
+    if (detected) {
+      owner = owner ?? detected.owner;
+      repoName = repoName ?? detected.name;
+    } else {
+      owner = owner ?? "unknown";
+      repoName = repoName ?? path3.basename(result.projectRoot);
+    }
+  }
+  const payload = {
+    token: options.token,
+    owner,
+    name: repoName,
+    totalFiles: result.totalFiles,
+    summary: {
+      clientComponents: result.clientGraph.length,
+      clientBoundaries: result.clientBoundaries.length,
+      creepCandidates: result.creepCandidates.length,
+      estimatedClientBytes: result.totalClientBytes,
+      recoverableBytes: result.recoverableBytes
+    },
+    scanDurationMs: scanDurationMs ?? null,
+    engineVersion: "client-creep@0.2.1",
+    // Include full JSON payload for the detail view
+    payload: {
+      projectRoot: result.projectRoot,
+      totalFiles: result.totalFiles,
+      creepCandidates: result.creepCandidates.map((c) => ({
+        file: c.displayPath,
+        recoverableKb: c.recoverableBytes / 1024,
+        chain: c.whyTrace.chain.map((f) => result.clientGraph.find((n) => n.filePath === f)?.displayPath ?? f).join(" \u2192 "),
+        signals: c.whyTrace.chain.length
+      })),
+      boundaries: result.clientBoundaries.map((b) => ({
+        file: b.displayPath,
+        signals: b.clientSignals.length,
+        kb: b.sizeBytes / 1024
+      }))
+    }
+  };
+  try {
+    const response = await fetch(`${dashboardUrl}/api/push`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const json = await response.json();
+    if (!response.ok) {
+      return { ok: false, error: json.error ?? `HTTP ${response.status}` };
+    }
+    return {
+      ok: true,
+      analysisId: json.analysisId,
+      dashboardUrl: json.dashboard
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `Network error: ${message}` };
+  }
+}
+
 // src/cli.ts
 var cli = cac("client-creep");
-cli.command("[dir]", "Analyze a Next.js project for client component creep").option("--dir <path>", "Path to the Next.js project (alias for positional arg)").option("--json", "Output results as JSON").option("--html [file]", "Write an interactive HTML report (default: client-creep-report.html)").option("--watch", "Watch for file changes and re-run analysis").option("--ci", "CI mode: exit 1 if client creep is detected").option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold").action(async (dir = ".", options) => {
+cli.command("[dir]", "Analyze a Next.js project for client component creep").option("--dir <path>", "Path to the Next.js project (alias for positional arg)").option("--json", "Output results as JSON").option("--html [file]", "Write an interactive HTML report (default: client-creep-report.html)").option("--watch", "Watch for file changes and re-run analysis").option("--ci", "CI mode: exit 1 if client creep is detected").option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold").option("--push", "Push results to the client-creep dashboard").option("--token <token>", "Supabase access token for --push (get from dashboard \u2192 Settings)").option("--dashboard <url>", "Dashboard URL (default: https://client-creep-dashboard.vercel.app)").option("--owner <owner>", "Repo owner override for --push (default: auto-detected from git remote)").option("--repo <name>", "Repo name override for --push (default: auto-detected from git remote)").action(async (dir = ".", options) => {
   const targetDir = options.dir ?? dir ?? ".";
   if (options.watch) {
-    await runWatch(path3.resolve(targetDir));
+    await runWatch(path4.resolve(targetDir));
     return;
   }
+  if (options.push && !options.token) {
+    console.error(pc3.red("  Error: --push requires --token"));
+    console.error(pc3.dim("  Get your token from the dashboard \u2192 Settings \u2192 Access Token"));
+    console.error(pc3.dim("  Usage: npx client-creep --push --token <your-token>"));
+    process.exit(1);
+  }
   try {
-    if (!options.json && !options.html) {
+    const showSpinner = !options.json && !options.html;
+    if (showSpinner) {
       process.stdout.write(pc3.dim("  Scanning\u2026\r"));
     }
+    const scanStart = Date.now();
     const result = await analyze(targetDir);
+    const scanDurationMs = Date.now() - scanStart;
     if (options.html !== void 0 && options.html !== false) {
       const outFile = typeof options.html === "string" ? options.html : "client-creep-report.html";
       renderHtml(result, outFile);
@@ -625,6 +723,31 @@ cli.command("[dir]", "Analyze a Next.js project for client component creep").opt
       renderJson(result);
     } else if (!options.html) {
       renderTerminal(result);
+    }
+    if (options.push && options.token) {
+      if (!options.json) {
+        process.stdout.write(pc3.dim("  Pushing to dashboard\u2026\r"));
+      }
+      const pushResult = await pushToDashboard(
+        result,
+        {
+          token: options.token,
+          dashboardUrl: options.dashboard,
+          owner: options.owner,
+          repo: options.repo
+        },
+        scanDurationMs
+      );
+      if (!options.json) {
+        if (pushResult.ok) {
+          console.log(pc3.green(`  \u2713 Pushed to dashboard`));
+          if (pushResult.dashboardUrl) {
+            console.log(pc3.dim(`    ${pushResult.dashboardUrl}`));
+          }
+        } else {
+          console.error(pc3.red(`  \u2717 Push failed: ${pushResult.error}`));
+        }
+      }
     }
     if (options.ci || options.budget) {
       const budgetKb = options.budget ? Number(options.budget) : void 0;
