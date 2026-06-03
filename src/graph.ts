@@ -13,33 +13,34 @@ export function buildImportGraph(
   const reverseEdges = new Map<string, Set<string>>();
   const aliases = loadAliases(projectRoot);
 
+  // Per-file raw imports (before resolution) and re-export sources — used for barrel detection
+  const rawImportsRecord = new Map<string, string[]>();
+  const reExportSourcesMap = new Map<string, Set<string>>();
+
   // First pass: parse all files
   for (const filePath of files) {
-    const { hasUseClient, imports, clientSignals } = parseFile(filePath);
+    const { hasUseClient, imports, reExportSources, clientSignals } = parseFile(filePath);
     const sizeBytes = safeStatSize(filePath);
 
     nodes.set(filePath, {
       filePath,
       displayPath: path.relative(projectRoot, filePath),
       isClientBoundary: hasUseClient,
-      isClientGraph: hasUseClient, // will be updated in propagation
+      isClientGraph: hasUseClient,
       clientSignals,
-      imports: [], // resolved imports added below
+      imports: [],
       sizeBytes,
     });
 
     edges.set(filePath, new Set());
     reverseEdges.set(filePath, new Set());
-
-    // Store raw import sources temporarily
-    (nodes.get(filePath) as ComponentNode & { _rawImports: string[] })._rawImports =
-      imports;
+    rawImportsRecord.set(filePath, imports);
+    reExportSourcesMap.set(filePath, new Set(reExportSources));
   }
 
   // Second pass: resolve imports and build edges
   for (const [filePath, node] of nodes) {
-    const rawImports = (node as ComponentNode & { _rawImports: string[] })
-      ._rawImports;
+    const rawImports = rawImportsRecord.get(filePath) ?? [];
     const importerDir = path.dirname(filePath);
     const resolvedImports: string[] = [];
 
@@ -53,10 +54,16 @@ export function buildImportGraph(
         if (!reverseEdges.has(resolved)) reverseEdges.set(resolved, new Set());
         reverseEdges.get(resolved)!.add(filePath);
 
-        // If the resolved file is a barrel (index.*), also wire edges to
-        // everything it re-exports so propagation follows through barrels
-        if (isBarrelFile(resolved)) {
-          const barrelExports = getBarrelExports(resolved, aliases, nodes);
+        // If the resolved file is a barrel, also wire direct edges to everything
+        // it re-exports so client propagation follows through barrel chains
+        if (isBarrelFile(resolved, reExportSourcesMap, rawImportsRecord)) {
+          const barrelExports = getBarrelExports(
+            resolved,
+            aliases,
+            nodes,
+            reExportSourcesMap,
+            rawImportsRecord
+          );
           for (const exported of barrelExports) {
             if (!edges.get(filePath)!.has(exported)) {
               edges.get(filePath)!.add(exported);
@@ -69,7 +76,6 @@ export function buildImportGraph(
     }
 
     node.imports = resolvedImports;
-    delete (node as ComponentNode & { _rawImports?: string[] })._rawImports;
   }
 
   return { nodes, edges, reverseEdges };
@@ -117,24 +123,54 @@ function safeStatSize(filePath: string): number {
   }
 }
 
-function isBarrelFile(filePath: string): boolean {
+/**
+ * A barrel is a file whose purpose is to re-export from other modules.
+ * Criteria: named `index.*`, OR has re-export sources but no own (non-re-export) imports.
+ */
+function isBarrelFile(
+  filePath: string,
+  reExportSourcesMap: Map<string, Set<string>>,
+  rawImportsRecord: Map<string, string[]>
+): boolean {
   const base = path.basename(filePath, path.extname(filePath));
-  return base === "index";
+  if (base === "index") return true;
+
+  const reExports = reExportSourcesMap.get(filePath);
+  if (!reExports || reExports.size === 0) return false;
+
+  // Pure barrel: every import in the file is a re-export source
+  const rawImports = rawImportsRecord.get(filePath) ?? [];
+  return rawImports.every((imp) => reExports.has(imp));
 }
 
+/**
+ * Returns all files transitively re-exported by a barrel, recursing through
+ * nested barrels with cycle protection.
+ */
 function getBarrelExports(
   barrelPath: string,
   aliases: TsPathAliases,
-  nodes: Map<string, ComponentNode>
+  nodes: Map<string, ComponentNode>,
+  reExportSourcesMap: Map<string, Set<string>>,
+  rawImportsRecord: Map<string, string[]>,
+  visited = new Set<string>()
 ): string[] {
-  const { imports } = parseFile(barrelPath);
+  if (visited.has(barrelPath)) return [];
+  visited.add(barrelPath);
+
+  const reExports = reExportSourcesMap.get(barrelPath) ?? new Set<string>();
   const barrelDir = path.dirname(barrelPath);
   const result: string[] = [];
 
-  for (const importSource of imports) {
+  for (const importSource of reExports) {
     const resolved = resolveImport(importSource, barrelDir, aliases);
-    if (resolved && nodes.has(resolved)) {
-      result.push(resolved);
+    if (!resolved || !nodes.has(resolved)) continue;
+    result.push(resolved);
+    // Recurse if the re-exported file is itself a barrel
+    if (isBarrelFile(resolved, reExportSourcesMap, rawImportsRecord)) {
+      result.push(
+        ...getBarrelExports(resolved, aliases, nodes, reExportSourcesMap, rawImportsRecord, visited)
+      );
     }
   }
 

@@ -6,6 +6,7 @@ import type {
   ExportAllDeclaration,
   ExportNamedDeclaration,
   Directive,
+  ImportExpression,
 } from "@babel/types";
 import fs from "node:fs";
 
@@ -79,6 +80,8 @@ const EVENT_PROP_PATTERN = /^on[A-Z]/;
 export interface ParseResult {
   hasUseClient: boolean;
   imports: string[];
+  /** Sources from `export * from` / `export { } from` statements — used for barrel detection */
+  reExportSources: string[];
   clientSignals: string[];
 }
 
@@ -87,7 +90,7 @@ export function parseFile(filePath: string): ParseResult {
   try {
     code = fs.readFileSync(filePath, "utf-8");
   } catch {
-    return { hasUseClient: false, imports: [], clientSignals: [] };
+    return { hasUseClient: false, imports: [], reExportSources: [], clientSignals: [] };
   }
 
   let ast;
@@ -98,10 +101,11 @@ export function parseFile(filePath: string): ParseResult {
       errorRecovery: true,
     });
   } catch {
-    return { hasUseClient: false, imports: [], clientSignals: [] };
+    return { hasUseClient: false, imports: [], reExportSources: [], clientSignals: [] };
   }
 
   const imports: string[] = [];
+  const reExportSources: string[] = [];
   const foundSignals = new Set<string>();
 
   // Check directives ("use client" / "use server")
@@ -127,13 +131,25 @@ export function parseFile(filePath: string): ParseResult {
 
     ExportAllDeclaration(nodePath: NodePath<ExportAllDeclaration>) {
       if (nodePath.node.source) {
-        imports.push(nodePath.node.source.value);
+        const src = nodePath.node.source.value;
+        imports.push(src);
+        reExportSources.push(src);
       }
     },
 
     ExportNamedDeclaration(nodePath: NodePath<ExportNamedDeclaration>) {
       if (nodePath.node.source) {
-        imports.push(nodePath.node.source.value);
+        const src = nodePath.node.source.value;
+        imports.push(src);
+        reExportSources.push(src);
+      }
+    },
+
+    // Dynamic import() — add to import graph so propagation follows through lazy boundaries
+    ImportExpression(nodePath: NodePath<ImportExpression>) {
+      const src = nodePath.node.source;
+      if (src.type === "StringLiteral") {
+        imports.push(src.value);
       }
     },
 
@@ -232,6 +248,7 @@ export function parseFile(filePath: string): ParseResult {
   return {
     hasUseClient,
     imports,
+    reExportSources,
     clientSignals: Array.from(foundSignals),
   };
 }

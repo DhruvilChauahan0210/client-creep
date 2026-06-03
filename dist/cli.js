@@ -3,7 +3,7 @@ import {
   analyze,
   resetAliases,
   resetWorkspaceCache
-} from "./chunk-EYRBZVM6.js";
+} from "./chunk-XV522M5T.js";
 
 // src/cli.ts
 import { cac } from "cac";
@@ -662,5 +662,5 @@ cli.command("[dir]", "Analyze a Next.js project for client component creep").opt
   }
 });
 cli.help();
-cli.version("0.1.2");
+cli.version("0.2.0");
 cli.parse();

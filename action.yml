@@ -23,6 +23,10 @@ inputs:
     description: Version of client-creep to use
     required: false
     default: "latest"
+  comment:
+    description: Post a summary comment on pull requests
+    required: false
+    default: "true"
 
 outputs:
   client-components:
@@ -40,6 +44,7 @@ runs:
   using: composite
   steps:
     - name: Run client-creep
+      id: run-cc
       shell: bash
       run: |
         ARGS="${{ inputs.dir }}"
@@ -50,17 +55,93 @@ runs:
           ARGS="$ARGS --budget ${{ inputs.budget }}"
         fi
 
-        # Run and capture JSON output for outputs
-        JSON=$(npx --yes client-creep@${{ inputs.version }} $ARGS --json 2>/dev/null || true)
+        CC_JSON_FILE="$RUNNER_TEMP/client-creep-output.json"
 
-        # Also run for human-readable output
-        npx --yes client-creep@${{ inputs.version }} $ARGS
+        # Save JSON output to temp file for PR comment and output parsing
+        npx --yes client-creep@${{ inputs.version }} $ARGS --json > "$CC_JSON_FILE" 2>/dev/null || true
 
-        # Set outputs
-        if [ -n "$JSON" ]; then
-          echo "client-components=$(echo $JSON | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8'));process.stdout.write(String(d.summary.clientComponents))")" >> $GITHUB_OUTPUT
-          echo "boundaries=$(echo $JSON | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8'));process.stdout.write(String(d.summary.clientBoundaries))")" >> $GITHUB_OUTPUT
-          echo "creep-candidates=$(echo $JSON | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8'));process.stdout.write(String(d.summary.creepCandidates))")" >> $GITHUB_OUTPUT
-          echo "estimated-kb=$(echo $JSON | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8'));process.stdout.write((d.summary.estimatedClientBytes/1024).toFixed(0))")" >> $GITHUB_OUTPUT
-          echo "recoverable-kb=$(echo $JSON | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8'));process.stdout.write((d.summary.recoverableBytes/1024).toFixed(0))")" >> $GITHUB_OUTPUT
+        # Show human-readable output in the Actions log
+        npx --yes client-creep@${{ inputs.version }} $ARGS || true
+
+        # Set step outputs from the JSON file
+        if [ -f "$CC_JSON_FILE" ]; then
+          node -e "
+            const d = JSON.parse(require('fs').readFileSync('$CC_JSON_FILE', 'utf-8'));
+            const s = d.summary;
+            const out = process.env.GITHUB_OUTPUT;
+            const fs = require('fs');
+            fs.appendFileSync(out, 'client-components=' + s.clientComponents + '\n');
+            fs.appendFileSync(out, 'boundaries=' + s.clientBoundaries + '\n');
+            fs.appendFileSync(out, 'creep-candidates=' + s.creepCandidates + '\n');
+            fs.appendFileSync(out, 'estimated-kb=' + (s.estimatedClientBytes / 1024).toFixed(0) + '\n');
+            fs.appendFileSync(out, 'recoverable-kb=' + (s.recoverableBytes / 1024).toFixed(0) + '\n');
+          " 2>/dev/null || true
         fi
+
+        # Re-run with CI flags to respect exit code (the --json run above swallows it)
+        npx --yes client-creep@${{ inputs.version }} $ARGS --json > /dev/null 2>&1
+
+    - name: Comment on PR
+      if: ${{ github.event_name == 'pull_request' && inputs.comment == 'true' }}
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ github.token }}
+        script: |
+          const fs = require('fs');
+          const jsonFile = process.env.RUNNER_TEMP + '/client-creep-output.json';
+
+          let data = {};
+          try {
+            data = JSON.parse(fs.readFileSync(jsonFile, 'utf-8'));
+          } catch {
+            console.log('client-creep: could not read JSON output, skipping PR comment');
+            return;
+          }
+
+          const s = data.summary ?? {};
+          const creepCount = s.creepCandidates ?? 0;
+          const estimatedKb = ((s.estimatedClientBytes ?? 0) / 1024).toFixed(0);
+          const recoverableKb = ((s.recoverableBytes ?? 0) / 1024).toFixed(0);
+          const statusIcon = creepCount > 0 ? '⚠️' : '✅';
+
+          const body = [
+            `## ${statusIcon} client-creep report`,
+            '',
+            '| Metric | Value |',
+            '|---|---|',
+            `| Client components | ${s.clientComponents ?? 0} |`,
+            `| \`"use client"\` boundaries | ${s.clientBoundaries ?? 0} |`,
+            `| Accidental creep candidates | ${creepCount} |`,
+            `| Estimated client JS | ${estimatedKb} KB |`,
+            `| Potentially recoverable | ${recoverableKb} KB |`,
+            '',
+            creepCount > 0
+              ? `> **${creepCount} component(s)** are client by accident — run \`npx client-creep\` locally to see the import chains and recover **${recoverableKb} KB**.`
+              : '> No accidental client creep detected. ✨',
+            '',
+            '<!-- client-creep-comment -->',
+          ].join('\n');
+
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          const existing = comments.find(c => c.body && c.body.includes('<!-- client-creep-comment -->'));
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+          }

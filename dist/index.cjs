@@ -139,7 +139,7 @@ function parseFile(filePath) {
   try {
     code = import_node_fs2.default.readFileSync(filePath, "utf-8");
   } catch {
-    return { hasUseClient: false, imports: [], clientSignals: [] };
+    return { hasUseClient: false, imports: [], reExportSources: [], clientSignals: [] };
   }
   let ast;
   try {
@@ -149,9 +149,10 @@ function parseFile(filePath) {
       errorRecovery: true
     });
   } catch {
-    return { hasUseClient: false, imports: [], clientSignals: [] };
+    return { hasUseClient: false, imports: [], reExportSources: [], clientSignals: [] };
   }
   const imports = [];
+  const reExportSources = [];
   const foundSignals = /* @__PURE__ */ new Set();
   const hasUseClient = ast.program.directives.some(
     (d) => d.value.value === "use client"
@@ -167,12 +168,23 @@ function parseFile(filePath) {
     },
     ExportAllDeclaration(nodePath) {
       if (nodePath.node.source) {
-        imports.push(nodePath.node.source.value);
+        const src = nodePath.node.source.value;
+        imports.push(src);
+        reExportSources.push(src);
       }
     },
     ExportNamedDeclaration(nodePath) {
       if (nodePath.node.source) {
-        imports.push(nodePath.node.source.value);
+        const src = nodePath.node.source.value;
+        imports.push(src);
+        reExportSources.push(src);
+      }
+    },
+    // Dynamic import() — add to import graph so propagation follows through lazy boundaries
+    ImportExpression(nodePath) {
+      const src = nodePath.node.source;
+      if (src.type === "StringLiteral") {
+        imports.push(src.value);
       }
     },
     Identifier(nodePath) {
@@ -228,6 +240,7 @@ function parseFile(filePath) {
   return {
     hasUseClient,
     imports,
+    reExportSources,
     clientSignals: Array.from(foundSignals)
   };
 }
@@ -433,26 +446,27 @@ function buildImportGraph(files, projectRoot) {
   const edges = /* @__PURE__ */ new Map();
   const reverseEdges = /* @__PURE__ */ new Map();
   const aliases = loadAliases(projectRoot);
+  const rawImportsRecord = /* @__PURE__ */ new Map();
+  const reExportSourcesMap = /* @__PURE__ */ new Map();
   for (const filePath of files) {
-    const { hasUseClient, imports, clientSignals } = parseFile(filePath);
+    const { hasUseClient, imports, reExportSources, clientSignals } = parseFile(filePath);
     const sizeBytes = safeStatSize(filePath);
     nodes.set(filePath, {
       filePath,
       displayPath: import_node_path4.default.relative(projectRoot, filePath),
       isClientBoundary: hasUseClient,
       isClientGraph: hasUseClient,
-      // will be updated in propagation
       clientSignals,
       imports: [],
-      // resolved imports added below
       sizeBytes
     });
     edges.set(filePath, /* @__PURE__ */ new Set());
     reverseEdges.set(filePath, /* @__PURE__ */ new Set());
-    nodes.get(filePath)._rawImports = imports;
+    rawImportsRecord.set(filePath, imports);
+    reExportSourcesMap.set(filePath, new Set(reExportSources));
   }
   for (const [filePath, node] of nodes) {
-    const rawImports = node._rawImports;
+    const rawImports = rawImportsRecord.get(filePath) ?? [];
     const importerDir = import_node_path4.default.dirname(filePath);
     const resolvedImports = [];
     for (const importSource of rawImports) {
@@ -463,8 +477,14 @@ function buildImportGraph(files, projectRoot) {
         edges.get(filePath).add(resolved);
         if (!reverseEdges.has(resolved)) reverseEdges.set(resolved, /* @__PURE__ */ new Set());
         reverseEdges.get(resolved).add(filePath);
-        if (isBarrelFile(resolved)) {
-          const barrelExports = getBarrelExports(resolved, aliases, nodes);
+        if (isBarrelFile(resolved, reExportSourcesMap, rawImportsRecord)) {
+          const barrelExports = getBarrelExports(
+            resolved,
+            aliases,
+            nodes,
+            reExportSourcesMap,
+            rawImportsRecord
+          );
           for (const exported of barrelExports) {
             if (!edges.get(filePath).has(exported)) {
               edges.get(filePath).add(exported);
@@ -476,7 +496,6 @@ function buildImportGraph(files, projectRoot) {
       }
     }
     node.imports = resolvedImports;
-    delete node._rawImports;
   }
   return { nodes, edges, reverseEdges };
 }
@@ -513,18 +532,28 @@ function safeStatSize(filePath) {
     return 0;
   }
 }
-function isBarrelFile(filePath) {
+function isBarrelFile(filePath, reExportSourcesMap, rawImportsRecord) {
   const base = import_node_path4.default.basename(filePath, import_node_path4.default.extname(filePath));
-  return base === "index";
+  if (base === "index") return true;
+  const reExports = reExportSourcesMap.get(filePath);
+  if (!reExports || reExports.size === 0) return false;
+  const rawImports = rawImportsRecord.get(filePath) ?? [];
+  return rawImports.every((imp) => reExports.has(imp));
 }
-function getBarrelExports(barrelPath, aliases, nodes) {
-  const { imports } = parseFile(barrelPath);
+function getBarrelExports(barrelPath, aliases, nodes, reExportSourcesMap, rawImportsRecord, visited = /* @__PURE__ */ new Set()) {
+  if (visited.has(barrelPath)) return [];
+  visited.add(barrelPath);
+  const reExports = reExportSourcesMap.get(barrelPath) ?? /* @__PURE__ */ new Set();
   const barrelDir = import_node_path4.default.dirname(barrelPath);
   const result = [];
-  for (const importSource of imports) {
+  for (const importSource of reExports) {
     const resolved = resolveImport(importSource, barrelDir, aliases);
-    if (resolved && nodes.has(resolved)) {
-      result.push(resolved);
+    if (!resolved || !nodes.has(resolved)) continue;
+    result.push(resolved);
+    if (isBarrelFile(resolved, reExportSourcesMap, rawImportsRecord)) {
+      result.push(
+        ...getBarrelExports(resolved, aliases, nodes, reExportSourcesMap, rawImportsRecord, visited)
+      );
     }
   }
   return result;

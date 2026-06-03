@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import {
   analyze
-} from "./chunk-EYRBZVM6.js";
+} from "./chunk-XV522M5T.js";
 export {
   analyze
 };
