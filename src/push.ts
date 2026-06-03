@@ -72,7 +72,7 @@ export async function pushToDashboard(
       recoverableBytes: result.recoverableBytes,
     },
     scanDurationMs: scanDurationMs ?? null,
-    engineVersion: "client-creep@0.2.1",
+    engineVersion: "client-creep@0.2.2",
     // Include full JSON payload for the detail view
     payload: {
       projectRoot: result.projectRoot,

@@ -11,7 +11,7 @@ export default function Footer() {
             </span>
             CLIENT-CREEP
           </div>
-          <span className="footer-version">v0.2.1 · MIT</span>
+          <span className="footer-version">v0.2.2 · MIT</span>
         </div>
         <div className="footer-links">
           {[
