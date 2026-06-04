@@ -34,6 +34,20 @@ const FEATURES = [
     desc: "Push results to the dashboard after every run or CI build. See how your client boundary evolves across PRs — catch creep before it compounds.",
     code: "npx client-creep --push --token <token>",
   },
+  {
+    tag: "--fix",
+    tagColor: "#f38ba8",
+    title: "AUTO-FIX",
+    desc: "Removes \"use client\" from every file flagged as an accidental creep candidate — files confirmed to have zero hooks, event handlers, or browser APIs.",
+    code: "npx client-creep --fix",
+  },
+  {
+    tag: "--fix-barrels",
+    tagColor: "#f5c2e7",
+    title: "FIX BARRELS",
+    desc: "\"use client\" in index.ts forces every re-export into the client bundle. This moves it from the barrel to only the components that actually need it.",
+    code: "npx client-creep --fix-barrels",
+  },
 ];
 
 export default function Features() {
@@ -41,7 +55,7 @@ export default function Features() {
     <section className="features-section">
       <div className="features-inner">
         <div className="features-header">
-          <p className="section-label" style={{ color: "#444" }}>/ V0.2 FEATURES /</p>
+          <p className="section-label" style={{ color: "#444" }}>/ V0.3 FEATURES /</p>
           <h2 className="section-headline section-headline-inv">
             EVERYTHING<br />YOU NEED.
           </h2>
