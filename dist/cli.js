@@ -181,6 +181,7 @@ function renderTerminal(result) {
 function renderJson(result) {
   const output = {
     projectRoot: result.projectRoot,
+    framework: result.framework,
     totalFiles: result.totalFiles,
     summary: {
       clientComponents: result.clientGraph.length,
@@ -573,9 +574,94 @@ window.addEventListener('resize', render);
 
 // src/watch.ts
 init_esm_shims();
-import fs2 from "fs";
+import fs3 from "fs";
 import pc2 from "picocolors";
-async function runWatch(targetDir) {
+
+// src/fix.ts
+init_esm_shims();
+import fs2 from "fs";
+import path3 from "path";
+function applyFix(candidates) {
+  const fixed = [];
+  const skipped = [];
+  for (const candidate of candidates) {
+    try {
+      const original = fs2.readFileSync(candidate.filePath, "utf-8");
+      const patched = removeUseClientDirective(original);
+      if (patched === original) {
+        skipped.push(candidate.filePath);
+      } else {
+        fs2.writeFileSync(candidate.filePath, patched, "utf-8");
+        fixed.push(candidate.filePath);
+      }
+    } catch {
+      skipped.push(candidate.filePath);
+    }
+  }
+  return { fixed, skipped };
+}
+function fixBarrels(result) {
+  const barrelsFixed = [];
+  const componentsAdded = [];
+  const skipped = [];
+  const nodeByPath = /* @__PURE__ */ new Map();
+  for (const node of [...result.clientBoundaries, ...result.clientGraph]) {
+    nodeByPath.set(node.filePath, node);
+  }
+  const aliases = loadAliases(result.projectRoot);
+  for (const boundary of result.clientBoundaries) {
+    const base = path3.basename(boundary.filePath, path3.extname(boundary.filePath));
+    if (base !== "index") continue;
+    const parsed = parseFile(boundary.filePath);
+    if (!parsed.hasUseClient || parsed.reExportSources.length === 0) continue;
+    const barrelDir = path3.dirname(boundary.filePath);
+    const toAddUseClient = [];
+    for (const src of parsed.reExportSources) {
+      const resolved = resolveImport(src, barrelDir, aliases);
+      if (!resolved) continue;
+      const node = nodeByPath.get(resolved);
+      if (node && node.clientSignals.length > 0) {
+        toAddUseClient.push(resolved);
+      }
+    }
+    if (toAddUseClient.length === 0) {
+      skipped.push(boundary.filePath);
+      continue;
+    }
+    let anyAdded = false;
+    for (const filePath of toAddUseClient) {
+      try {
+        const content = fs2.readFileSync(filePath, "utf-8");
+        if (/^["']use client["']/.test(content)) continue;
+        fs2.writeFileSync(filePath, `"use client";
+${content}`, "utf-8");
+        componentsAdded.push(filePath);
+        anyAdded = true;
+      } catch {
+        skipped.push(filePath);
+      }
+    }
+    if (anyAdded) {
+      try {
+        const original = fs2.readFileSync(boundary.filePath, "utf-8");
+        const patched = removeUseClientDirective(original);
+        if (patched !== original) {
+          fs2.writeFileSync(boundary.filePath, patched, "utf-8");
+          barrelsFixed.push(boundary.filePath);
+        }
+      } catch {
+        skipped.push(boundary.filePath);
+      }
+    }
+  }
+  return { barrelsFixed, componentsAdded, skipped };
+}
+function removeUseClientDirective(content) {
+  return content.replace(/^["']use client["'];?\r?\n/, "");
+}
+
+// src/watch.ts
+async function runWatch(targetDir, options = {}) {
   let debounce = null;
   let running = false;
   const run = async () => {
@@ -588,6 +674,22 @@ async function runWatch(targetDir) {
       resetWorkspaceCache();
       const result = await analyze(targetDir);
       renderTerminal(result);
+      if (options.fix && result.creepCandidates.length > 0) {
+        const fixResult = applyFix(result.creepCandidates);
+        if (fixResult.fixed.length > 0) {
+          console.log(pc2.green(`  \u2713 Auto-fixed ${fixResult.fixed.length} file${fixResult.fixed.length !== 1 ? "s" : ""} \u2014 re-scanning\u2026`));
+          setTimeout(run, 100);
+          return;
+        }
+      }
+      if (options.fixBarrels) {
+        const barrelResult = fixBarrels(result);
+        if (barrelResult.barrelsFixed.length > 0) {
+          console.log(pc2.green(`  \u2713 Auto-fixed ${barrelResult.barrelsFixed.length} barrel${barrelResult.barrelsFixed.length !== 1 ? "s" : ""} \u2014 re-scanning\u2026`));
+          setTimeout(run, 100);
+          return;
+        }
+      }
       console.log(pc2.dim("  Watching for changes\u2026 (Ctrl+C to stop)"));
     } catch (err) {
       console.error(pc2.red(`  Error: ${err instanceof Error ? err.message : String(err)}`));
@@ -596,7 +698,7 @@ async function runWatch(targetDir) {
     }
   };
   await run();
-  const watcher = fs2.watch(
+  const watcher = fs3.watch(
     targetDir,
     { recursive: true },
     (_event, filename) => {
@@ -619,7 +721,19 @@ async function runWatch(targetDir) {
 
 // src/push.ts
 init_esm_shims();
-import path3 from "path";
+import path4 from "path";
+import fs4 from "fs";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+var __dirname2 = dirname(fileURLToPath(import.meta.url));
+function getVersion() {
+  try {
+    const pkg = JSON.parse(fs4.readFileSync(path4.join(__dirname2, "../package.json"), "utf-8"));
+    return `client-creep@${pkg.version}`;
+  } catch {
+    return "client-creep";
+  }
+}
 async function detectRepoFromGit(projectRoot) {
   try {
     const { execa } = await import("./execa-MNBESVMJ.js");
@@ -644,7 +758,7 @@ async function pushToDashboard(result, options, scanDurationMs) {
       repoName = repoName ?? detected.name;
     } else {
       owner = owner ?? "unknown";
-      repoName = repoName ?? path3.basename(result.projectRoot);
+      repoName = repoName ?? path4.basename(result.projectRoot);
     }
   }
   const payload = {
@@ -660,7 +774,7 @@ async function pushToDashboard(result, options, scanDurationMs) {
       recoverableBytes: result.recoverableBytes
     },
     scanDurationMs: scanDurationMs ?? null,
-    engineVersion: "client-creep@0.3.0",
+    engineVersion: getVersion(),
     // Include full JSON payload for the detail view
     payload: {
       projectRoot: result.projectRoot,
@@ -699,95 +813,15 @@ async function pushToDashboard(result, options, scanDurationMs) {
   }
 }
 
-// src/fix.ts
-init_esm_shims();
-import fs3 from "fs";
-import path4 from "path";
-function applyFix(candidates) {
-  const fixed = [];
-  const skipped = [];
-  for (const candidate of candidates) {
-    try {
-      const original = fs3.readFileSync(candidate.filePath, "utf-8");
-      const patched = removeUseClientDirective(original);
-      if (patched === original) {
-        skipped.push(candidate.filePath);
-      } else {
-        fs3.writeFileSync(candidate.filePath, patched, "utf-8");
-        fixed.push(candidate.filePath);
-      }
-    } catch {
-      skipped.push(candidate.filePath);
-    }
-  }
-  return { fixed, skipped };
-}
-function fixBarrels(result) {
-  const barrelsFixed = [];
-  const componentsAdded = [];
-  const skipped = [];
-  const nodeByPath = /* @__PURE__ */ new Map();
-  for (const node of [...result.clientBoundaries, ...result.clientGraph]) {
-    nodeByPath.set(node.filePath, node);
-  }
-  const aliases = loadAliases(result.projectRoot);
-  for (const boundary of result.clientBoundaries) {
-    const base = path4.basename(boundary.filePath, path4.extname(boundary.filePath));
-    if (base !== "index") continue;
-    const parsed = parseFile(boundary.filePath);
-    if (!parsed.hasUseClient || parsed.reExportSources.length === 0) continue;
-    const barrelDir = path4.dirname(boundary.filePath);
-    const toAddUseClient = [];
-    for (const src of parsed.reExportSources) {
-      const resolved = resolveImport(src, barrelDir, aliases);
-      if (!resolved) continue;
-      const node = nodeByPath.get(resolved);
-      if (node && node.clientSignals.length > 0) {
-        toAddUseClient.push(resolved);
-      }
-    }
-    if (toAddUseClient.length === 0) {
-      skipped.push(boundary.filePath);
-      continue;
-    }
-    let anyAdded = false;
-    for (const filePath of toAddUseClient) {
-      try {
-        const content = fs3.readFileSync(filePath, "utf-8");
-        if (/^["']use client["']/.test(content)) continue;
-        fs3.writeFileSync(filePath, `"use client";
-${content}`, "utf-8");
-        componentsAdded.push(filePath);
-        anyAdded = true;
-      } catch {
-        skipped.push(filePath);
-      }
-    }
-    if (anyAdded) {
-      try {
-        const original = fs3.readFileSync(boundary.filePath, "utf-8");
-        const patched = removeUseClientDirective(original);
-        if (patched !== original) {
-          fs3.writeFileSync(boundary.filePath, patched, "utf-8");
-          barrelsFixed.push(boundary.filePath);
-        }
-      } catch {
-        skipped.push(boundary.filePath);
-      }
-    }
-  }
-  return { barrelsFixed, componentsAdded, skipped };
-}
-function removeUseClientDirective(content) {
-  return content.replace(/^["']use client["'];?\r?\n/, "");
-}
-
 // src/cli.ts
 var cli = cac("client-creep");
 cli.command("[dir]", "Analyze a Next.js project for client component creep").option("--dir <path>", "Path to the Next.js project (alias for positional arg)").option("--json", "Output results as JSON").option("--html [file]", "Write an interactive HTML report (default: client-creep-report.html)").option("--watch", "Watch for file changes and re-run analysis").option("--ci", "CI mode: exit 1 if client creep is detected").option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold").option("--push", "Push results to the client-creep dashboard").option("--token <token>", "Supabase access token for --push (get from dashboard \u2192 Settings)").option("--dashboard <url>", "Dashboard URL (default: https://client-creep-dashboard.vercel.app)").option("--owner <owner>", "Repo owner override for --push (default: auto-detected from git remote)").option("--repo <name>", "Repo name override for --push (default: auto-detected from git remote)").option("--fix", "Remove 'use client' from files with no client signals (creep candidates)").option("--fix-barrels", "Move 'use client' from barrel files (index.ts) to the components that need it").action(async (dir = ".", options) => {
   const targetDir = options.dir ?? dir ?? ".";
   if (options.watch) {
-    await runWatch(path5.resolve(targetDir));
+    await runWatch(path5.resolve(targetDir), {
+      fix: options.fix,
+      fixBarrels: options.fixBarrels
+    });
     return;
   }
   if (options.push && !options.token) {

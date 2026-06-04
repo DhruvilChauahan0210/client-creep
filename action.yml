@@ -65,6 +65,18 @@ runs:
         fi
         if [ "${{ inputs.push }}" = "true" ] && [ -n "${{ inputs.token }}" ]; then
           ARGS="$ARGS --push --token ${{ inputs.token }}"
+          # Capture push response for PR comment detail level
+          PUSH_RESPONSE_FILE="$RUNNER_TEMP/client-creep-push-response.json"
+          node -e "
+            const r = require('fs').readFileSync('$CC_JSON_FILE', 'utf-8');
+            const d = JSON.parse(r);
+            const url = '${{ inputs.dashboard }}' || 'https://client-creep-dashboard.vercel.app';
+            fetch(url.replace(/\\/$/, '') + '/api/push', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: '${{ inputs.token }}', owner: process.env.GITHUB_REPOSITORY_OWNER, name: process.env.GITHUB_REPOSITORY.split('/')[1], totalFiles: d.totalFiles, summary: d.summary })
+            }).then(r => r.json()).then(j => require('fs').writeFileSync('$PUSH_RESPONSE_FILE', JSON.stringify(j))).catch(() => {});
+          " 2>/dev/null || true
         fi
         if [ -n "${{ inputs.dashboard }}" ]; then
           ARGS="$ARGS --dashboard ${{ inputs.dashboard }}"
@@ -132,6 +144,12 @@ runs:
           let baseData = null;
           try { baseData = JSON.parse(fs.readFileSync(baseJsonFile, 'utf-8')); } catch {}
 
+          // Read push response to check if detailed comments are enabled (Pro plan)
+          let pushResponse = null;
+          const pushResponseFile = process.env.RUNNER_TEMP + '/client-creep-push-response.json';
+          try { pushResponse = JSON.parse(fs.readFileSync(pushResponseFile, 'utf-8')); } catch {}
+          const detailedComments = pushResponse?.detailedComments ?? false;
+
           const s = data.summary ?? {};
           const b = baseData?.summary ?? null;
 
@@ -161,6 +179,26 @@ runs:
             ? `*Compared against \`${{ github.base_ref }}\`.*`
             : '';
 
+          // Build file-level detail section for Pro users
+          let detailSection = '';
+          if (detailedComments && data.creepCandidates?.length > 0) {
+            const topFiles = data.creepCandidates.slice(0, 10);
+            const fileRows = topFiles.map(c => `| \`${c.file}\` | ${(c.recoverableBytes / 1024).toFixed(1)} KB |`).join('\n');
+            detailSection = [
+              '',
+              '<details>',
+              '<summary>📂 Creep candidates (file breakdown)</summary>',
+              '',
+              '| File | Recoverable |',
+              '|---|---|',
+              fileRows,
+              data.creepCandidates.length > 10 ? `\n_…and ${data.creepCandidates.length - 10} more. Run \`npx client-creep\` locally for the full list._` : '',
+              '</details>',
+            ].join('\n');
+          } else if (!detailedComments && creepCount > 0) {
+            detailSection = '\n> 💡 **Pro tip:** Upgrade to [client-creep Pro](https://client-creep-dashboard.vercel.app) for file-level breakdown in PR comments.';
+          }
+
           const body = [
             `## ${statusIcon} client-creep report`,
             '',
@@ -171,6 +209,7 @@ runs:
             creepCount > 0
               ? `> **${creepCount} component(s)** are client by accident — run \`npx client-creep\` locally to see the import chains and recover **${recoverableKb} KB**.`
               : '> No accidental client creep detected. ✨',
+            detailSection,
             '',
             diffNote,
             '',

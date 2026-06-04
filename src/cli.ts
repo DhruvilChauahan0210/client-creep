@@ -47,7 +47,10 @@ cli
 
     // Watch mode — hand off entirely
     if (options.watch) {
-      await runWatch(path.resolve(targetDir));
+      await runWatch(path.resolve(targetDir), {
+        fix: options.fix,
+        fixBarrels: options.fixBarrels,
+      });
       return;
     }
 

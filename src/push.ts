@@ -1,5 +1,18 @@
 import type { AnalysisResult } from "./types.js";
 import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+function getVersion(): string {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"), "utf-8"));
+    return `client-creep@${pkg.version}`;
+  } catch {
+    return "client-creep";
+  }
+}
 
 export interface PushOptions {
   token: string;
@@ -72,7 +85,7 @@ export async function pushToDashboard(
       recoverableBytes: result.recoverableBytes,
     },
     scanDurationMs: scanDurationMs ?? null,
-    engineVersion: "client-creep@0.3.0",
+    engineVersion: getVersion(),
     // Include full JSON payload for the detail view
     payload: {
       projectRoot: result.projectRoot,

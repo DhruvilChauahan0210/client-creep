@@ -227,6 +227,7 @@ export function renderTerminal(result: AnalysisResult): void {
 export function renderJson(result: AnalysisResult): void {
   const output = {
     projectRoot: result.projectRoot,
+    framework: result.framework,
     totalFiles: result.totalFiles,
     summary: {
       clientComponents: result.clientGraph.length,

@@ -44,9 +44,12 @@ var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
 // node_modules/tsup/assets/cjs_shims.js
+var getImportMetaUrl, importMetaUrl;
 var init_cjs_shims = __esm({
   "node_modules/tsup/assets/cjs_shims.js"() {
     "use strict";
+    getImportMetaUrl = () => typeof document === "undefined" ? new URL(`file:${__filename}`).href : document.currentScript && document.currentScript.tagName.toUpperCase() === "SCRIPT" ? document.currentScript.src : new URL("main.js", document.baseURI).href;
+    importMetaUrl = /* @__PURE__ */ getImportMetaUrl();
   }
 });
 
@@ -57,7 +60,7 @@ var require_windows = __commonJS({
     init_cjs_shims();
     module2.exports = isexe;
     isexe.sync = sync;
-    var fs9 = require("fs");
+    var fs10 = require("fs");
     function checkPathExt(path12, options) {
       var pathext = options.pathExt !== void 0 ? options.pathExt : process.env.PATHEXT;
       if (!pathext) {
@@ -82,12 +85,12 @@ var require_windows = __commonJS({
       return checkPathExt(path12, options);
     }
     function isexe(path12, options, cb) {
-      fs9.stat(path12, function(er, stat) {
+      fs10.stat(path12, function(er, stat) {
         cb(er, er ? false : checkStat(stat, path12, options));
       });
     }
     function sync(path12, options) {
-      return checkStat(fs9.statSync(path12), path12, options);
+      return checkStat(fs10.statSync(path12), path12, options);
     }
   }
 });
@@ -99,14 +102,14 @@ var require_mode = __commonJS({
     init_cjs_shims();
     module2.exports = isexe;
     isexe.sync = sync;
-    var fs9 = require("fs");
+    var fs10 = require("fs");
     function isexe(path12, options, cb) {
-      fs9.stat(path12, function(er, stat) {
+      fs10.stat(path12, function(er, stat) {
         cb(er, er ? false : checkStat(stat, options));
       });
     }
     function sync(path12, options) {
-      return checkStat(fs9.statSync(path12), options);
+      return checkStat(fs10.statSync(path12), options);
     }
     function checkStat(stat, options) {
       return stat.isFile() && checkMode(stat, options);
@@ -132,7 +135,7 @@ var require_isexe = __commonJS({
   "node_modules/isexe/index.js"(exports2, module2) {
     "use strict";
     init_cjs_shims();
-    var fs9 = require("fs");
+    var fs10 = require("fs");
     var core;
     if (process.platform === "win32" || global.TESTING_WINDOWS) {
       core = require_windows();
@@ -404,16 +407,16 @@ var require_readShebang = __commonJS({
   "node_modules/cross-spawn/lib/util/readShebang.js"(exports2, module2) {
     "use strict";
     init_cjs_shims();
-    var fs9 = require("fs");
+    var fs10 = require("fs");
     var shebangCommand = require_shebang_command();
     function readShebang(command) {
       const size = 150;
       const buffer = Buffer.alloc(size);
       let fd;
       try {
-        fd = fs9.openSync(command, "r");
-        fs9.readSync(fd, buffer, 0, size, 0);
-        fs9.closeSync(fd);
+        fd = fs10.openSync(command, "r");
+        fs10.readSync(fd, buffer, 0, size, 0);
+        fs10.closeSync(fd);
       } catch (e) {
       }
       return shebangCommand(buffer.toString());
@@ -602,13 +605,13 @@ var init_path_key = __esm({
 });
 
 // node_modules/npm-run-path/index.js
-var import_node_process, import_node_path7, import_node_url, npmRunPath, applyPreferLocal, applyExecPath, npmRunPathEnv;
+var import_node_process, import_node_path8, import_node_url, npmRunPath, applyPreferLocal, applyExecPath, npmRunPathEnv;
 var init_npm_run_path = __esm({
   "node_modules/npm-run-path/index.js"() {
     "use strict";
     init_cjs_shims();
     import_node_process = __toESM(require("process"), 1);
-    import_node_path7 = __toESM(require("path"), 1);
+    import_node_path8 = __toESM(require("path"), 1);
     import_node_url = require("url");
     init_path_key();
     npmRunPath = ({
@@ -619,7 +622,7 @@ var init_npm_run_path = __esm({
       addExecPath = true
     } = {}) => {
       const cwdString = cwd instanceof URL ? (0, import_node_url.fileURLToPath)(cwd) : cwd;
-      const cwdPath = import_node_path7.default.resolve(cwdString);
+      const cwdPath = import_node_path8.default.resolve(cwdString);
       const result = [];
       if (preferLocal) {
         applyPreferLocal(result, cwdPath);
@@ -627,19 +630,19 @@ var init_npm_run_path = __esm({
       if (addExecPath) {
         applyExecPath(result, execPath, cwdPath);
       }
-      return [...result, pathOption].join(import_node_path7.default.delimiter);
+      return [...result, pathOption].join(import_node_path8.default.delimiter);
     };
     applyPreferLocal = (result, cwdPath) => {
       let previous;
       while (previous !== cwdPath) {
-        result.push(import_node_path7.default.join(cwdPath, "node_modules/.bin"));
+        result.push(import_node_path8.default.join(cwdPath, "node_modules/.bin"));
         previous = cwdPath;
-        cwdPath = import_node_path7.default.resolve(cwdPath, "..");
+        cwdPath = import_node_path8.default.resolve(cwdPath, "..");
       }
     };
     applyExecPath = (result, execPath, cwdPath) => {
       const execPathString = execPath instanceof URL ? (0, import_node_url.fileURLToPath)(execPath) : execPath;
-      result.push(import_node_path7.default.resolve(cwdPath, execPathString, ".."));
+      result.push(import_node_path8.default.resolve(cwdPath, execPathString, ".."));
     };
     npmRunPathEnv = ({ env = import_node_process.default.env, ...options } = {}) => {
       env = { ...env };
@@ -1638,18 +1641,18 @@ var init_is_stream = __esm({
 });
 
 // node_modules/execa/lib/pipe.js
-var import_node_fs8, import_node_child_process, isExecaChildProcess, pipeToTarget, addPipeMethods;
+var import_node_fs9, import_node_child_process, isExecaChildProcess, pipeToTarget, addPipeMethods;
 var init_pipe = __esm({
   "node_modules/execa/lib/pipe.js"() {
     "use strict";
     init_cjs_shims();
-    import_node_fs8 = require("fs");
+    import_node_fs9 = require("fs");
     import_node_child_process = require("child_process");
     init_is_stream();
     isExecaChildProcess = (target) => target instanceof import_node_child_process.ChildProcess && typeof target.then === "function";
     pipeToTarget = (spawned, streamName, target) => {
       if (typeof target === "string") {
-        spawned[streamName].pipe((0, import_node_fs8.createWriteStream)(target));
+        spawned[streamName].pipe((0, import_node_fs9.createWriteStream)(target));
         return spawned;
       }
       if (isWritableStream(target)) {
@@ -1966,12 +1969,12 @@ var require_merge_stream = __commonJS({
 });
 
 // node_modules/execa/lib/stream.js
-var import_node_fs9, import_promises, import_merge_stream, validateInputOptions, getInputSync, handleInputSync, getInput, handleInput, makeAllStream, getBufferedData, getStreamPromise, applyEncoding, getSpawnedResult;
+var import_node_fs10, import_promises, import_merge_stream, validateInputOptions, getInputSync, handleInputSync, getInput, handleInput, makeAllStream, getBufferedData, getStreamPromise, applyEncoding, getSpawnedResult;
 var init_stream = __esm({
   "node_modules/execa/lib/stream.js"() {
     "use strict";
     init_cjs_shims();
-    import_node_fs9 = require("fs");
+    import_node_fs10 = require("fs");
     import_promises = require("timers/promises");
     init_is_stream();
     init_source();
@@ -1986,7 +1989,7 @@ var init_stream = __esm({
         return input;
       }
       validateInputOptions(input);
-      return (0, import_node_fs9.readFileSync)(inputFile);
+      return (0, import_node_fs10.readFileSync)(inputFile);
     };
     handleInputSync = (options) => {
       const input = getInputSync(options);
@@ -2000,7 +2003,7 @@ var init_stream = __esm({
         return input;
       }
       validateInputOptions(input);
-      return (0, import_node_fs9.createReadStream)(inputFile);
+      return (0, import_node_fs10.createReadStream)(inputFile);
     };
     handleInput = (spawned, options) => {
       const input = getInput(options);
@@ -2416,13 +2419,13 @@ function execaNode(scriptPath, args, options = {}) {
     }
   );
 }
-var import_node_buffer2, import_node_path8, import_node_child_process3, import_node_process4, import_cross_spawn, DEFAULT_MAX_BUFFER, getEnv, handleArguments, handleOutput, normalizeScriptStdin, normalizeScriptOptions, $;
+var import_node_buffer2, import_node_path9, import_node_child_process3, import_node_process4, import_cross_spawn, DEFAULT_MAX_BUFFER, getEnv, handleArguments, handleOutput, normalizeScriptStdin, normalizeScriptOptions, $;
 var init_execa = __esm({
   "node_modules/execa/index.js"() {
     "use strict";
     init_cjs_shims();
     import_node_buffer2 = require("buffer");
-    import_node_path8 = __toESM(require("path"), 1);
+    import_node_path9 = __toESM(require("path"), 1);
     import_node_child_process3 = __toESM(require("child_process"), 1);
     import_node_process4 = __toESM(require("process"), 1);
     import_cross_spawn = __toESM(require_cross_spawn(), 1);
@@ -2468,7 +2471,7 @@ var init_execa = __esm({
       };
       options.env = getEnv(options);
       options.stdio = normalizeStdio(options);
-      if (import_node_process4.default.platform === "win32" && import_node_path8.default.basename(file, ".exe") === "cmd") {
+      if (import_node_process4.default.platform === "win32" && import_node_path9.default.basename(file, ".exe") === "cmd") {
         args.unshift("/q");
       }
       return { file, args, options, parsed };
@@ -2496,7 +2499,7 @@ var init_execa = __esm({
 init_cjs_shims();
 var import_cac = require("cac");
 var import_picocolors3 = __toESM(require("picocolors"), 1);
-var import_node_path11 = __toESM(require("path"), 1);
+var import_node_path12 = __toESM(require("path"), 1);
 
 // src/index.ts
 init_cjs_shims();
@@ -3334,6 +3337,7 @@ function renderTerminal(result) {
 function renderJson(result) {
   const output = {
     projectRoot: result.projectRoot,
+    framework: result.framework,
     totalFiles: result.totalFiles,
     summary: {
       clientComponents: result.clientGraph.length,
@@ -3726,9 +3730,94 @@ window.addEventListener('resize', render);
 
 // src/watch.ts
 init_cjs_shims();
-var import_node_fs7 = __toESM(require("fs"), 1);
+var import_node_fs8 = __toESM(require("fs"), 1);
 var import_picocolors2 = __toESM(require("picocolors"), 1);
-async function runWatch(targetDir) {
+
+// src/fix.ts
+init_cjs_shims();
+var import_node_fs7 = __toESM(require("fs"), 1);
+var import_node_path7 = __toESM(require("path"), 1);
+function applyFix(candidates) {
+  const fixed = [];
+  const skipped = [];
+  for (const candidate of candidates) {
+    try {
+      const original = import_node_fs7.default.readFileSync(candidate.filePath, "utf-8");
+      const patched = removeUseClientDirective(original);
+      if (patched === original) {
+        skipped.push(candidate.filePath);
+      } else {
+        import_node_fs7.default.writeFileSync(candidate.filePath, patched, "utf-8");
+        fixed.push(candidate.filePath);
+      }
+    } catch {
+      skipped.push(candidate.filePath);
+    }
+  }
+  return { fixed, skipped };
+}
+function fixBarrels(result) {
+  const barrelsFixed = [];
+  const componentsAdded = [];
+  const skipped = [];
+  const nodeByPath = /* @__PURE__ */ new Map();
+  for (const node of [...result.clientBoundaries, ...result.clientGraph]) {
+    nodeByPath.set(node.filePath, node);
+  }
+  const aliases2 = loadAliases(result.projectRoot);
+  for (const boundary of result.clientBoundaries) {
+    const base = import_node_path7.default.basename(boundary.filePath, import_node_path7.default.extname(boundary.filePath));
+    if (base !== "index") continue;
+    const parsed = parseFile(boundary.filePath);
+    if (!parsed.hasUseClient || parsed.reExportSources.length === 0) continue;
+    const barrelDir = import_node_path7.default.dirname(boundary.filePath);
+    const toAddUseClient = [];
+    for (const src of parsed.reExportSources) {
+      const resolved = resolveImport(src, barrelDir, aliases2);
+      if (!resolved) continue;
+      const node = nodeByPath.get(resolved);
+      if (node && node.clientSignals.length > 0) {
+        toAddUseClient.push(resolved);
+      }
+    }
+    if (toAddUseClient.length === 0) {
+      skipped.push(boundary.filePath);
+      continue;
+    }
+    let anyAdded = false;
+    for (const filePath of toAddUseClient) {
+      try {
+        const content = import_node_fs7.default.readFileSync(filePath, "utf-8");
+        if (/^["']use client["']/.test(content)) continue;
+        import_node_fs7.default.writeFileSync(filePath, `"use client";
+${content}`, "utf-8");
+        componentsAdded.push(filePath);
+        anyAdded = true;
+      } catch {
+        skipped.push(filePath);
+      }
+    }
+    if (anyAdded) {
+      try {
+        const original = import_node_fs7.default.readFileSync(boundary.filePath, "utf-8");
+        const patched = removeUseClientDirective(original);
+        if (patched !== original) {
+          import_node_fs7.default.writeFileSync(boundary.filePath, patched, "utf-8");
+          barrelsFixed.push(boundary.filePath);
+        }
+      } catch {
+        skipped.push(boundary.filePath);
+      }
+    }
+  }
+  return { barrelsFixed, componentsAdded, skipped };
+}
+function removeUseClientDirective(content) {
+  return content.replace(/^["']use client["'];?\r?\n/, "");
+}
+
+// src/watch.ts
+async function runWatch(targetDir, options = {}) {
   let debounce = null;
   let running = false;
   const run = async () => {
@@ -3741,6 +3830,22 @@ async function runWatch(targetDir) {
       resetWorkspaceCache();
       const result = await analyze(targetDir);
       renderTerminal(result);
+      if (options.fix && result.creepCandidates.length > 0) {
+        const fixResult = applyFix(result.creepCandidates);
+        if (fixResult.fixed.length > 0) {
+          console.log(import_picocolors2.default.green(`  \u2713 Auto-fixed ${fixResult.fixed.length} file${fixResult.fixed.length !== 1 ? "s" : ""} \u2014 re-scanning\u2026`));
+          setTimeout(run, 100);
+          return;
+        }
+      }
+      if (options.fixBarrels) {
+        const barrelResult = fixBarrels(result);
+        if (barrelResult.barrelsFixed.length > 0) {
+          console.log(import_picocolors2.default.green(`  \u2713 Auto-fixed ${barrelResult.barrelsFixed.length} barrel${barrelResult.barrelsFixed.length !== 1 ? "s" : ""} \u2014 re-scanning\u2026`));
+          setTimeout(run, 100);
+          return;
+        }
+      }
       console.log(import_picocolors2.default.dim("  Watching for changes\u2026 (Ctrl+C to stop)"));
     } catch (err) {
       console.error(import_picocolors2.default.red(`  Error: ${err instanceof Error ? err.message : String(err)}`));
@@ -3749,7 +3854,7 @@ async function runWatch(targetDir) {
     }
   };
   await run();
-  const watcher = import_node_fs7.default.watch(
+  const watcher = import_node_fs8.default.watch(
     targetDir,
     { recursive: true },
     (_event, filename) => {
@@ -3772,7 +3877,19 @@ async function runWatch(targetDir) {
 
 // src/push.ts
 init_cjs_shims();
-var import_node_path9 = __toESM(require("path"), 1);
+var import_node_path10 = __toESM(require("path"), 1);
+var import_node_fs11 = __toESM(require("fs"), 1);
+var import_node_url2 = require("url");
+var import_node_path11 = require("path");
+var __dirname = (0, import_node_path11.dirname)((0, import_node_url2.fileURLToPath)(importMetaUrl));
+function getVersion() {
+  try {
+    const pkg = JSON.parse(import_node_fs11.default.readFileSync(import_node_path10.default.join(__dirname, "../package.json"), "utf-8"));
+    return `client-creep@${pkg.version}`;
+  } catch {
+    return "client-creep";
+  }
+}
 async function detectRepoFromGit(projectRoot) {
   try {
     const { execa: execa2 } = await Promise.resolve().then(() => (init_execa(), execa_exports));
@@ -3797,7 +3914,7 @@ async function pushToDashboard(result, options, scanDurationMs) {
       repoName = repoName ?? detected.name;
     } else {
       owner = owner ?? "unknown";
-      repoName = repoName ?? import_node_path9.default.basename(result.projectRoot);
+      repoName = repoName ?? import_node_path10.default.basename(result.projectRoot);
     }
   }
   const payload = {
@@ -3813,7 +3930,7 @@ async function pushToDashboard(result, options, scanDurationMs) {
       recoverableBytes: result.recoverableBytes
     },
     scanDurationMs: scanDurationMs ?? null,
-    engineVersion: "client-creep@0.3.0",
+    engineVersion: getVersion(),
     // Include full JSON payload for the detail view
     payload: {
       projectRoot: result.projectRoot,
@@ -3852,95 +3969,15 @@ async function pushToDashboard(result, options, scanDurationMs) {
   }
 }
 
-// src/fix.ts
-init_cjs_shims();
-var import_node_fs10 = __toESM(require("fs"), 1);
-var import_node_path10 = __toESM(require("path"), 1);
-function applyFix(candidates) {
-  const fixed = [];
-  const skipped = [];
-  for (const candidate of candidates) {
-    try {
-      const original = import_node_fs10.default.readFileSync(candidate.filePath, "utf-8");
-      const patched = removeUseClientDirective(original);
-      if (patched === original) {
-        skipped.push(candidate.filePath);
-      } else {
-        import_node_fs10.default.writeFileSync(candidate.filePath, patched, "utf-8");
-        fixed.push(candidate.filePath);
-      }
-    } catch {
-      skipped.push(candidate.filePath);
-    }
-  }
-  return { fixed, skipped };
-}
-function fixBarrels(result) {
-  const barrelsFixed = [];
-  const componentsAdded = [];
-  const skipped = [];
-  const nodeByPath = /* @__PURE__ */ new Map();
-  for (const node of [...result.clientBoundaries, ...result.clientGraph]) {
-    nodeByPath.set(node.filePath, node);
-  }
-  const aliases2 = loadAliases(result.projectRoot);
-  for (const boundary of result.clientBoundaries) {
-    const base = import_node_path10.default.basename(boundary.filePath, import_node_path10.default.extname(boundary.filePath));
-    if (base !== "index") continue;
-    const parsed = parseFile(boundary.filePath);
-    if (!parsed.hasUseClient || parsed.reExportSources.length === 0) continue;
-    const barrelDir = import_node_path10.default.dirname(boundary.filePath);
-    const toAddUseClient = [];
-    for (const src of parsed.reExportSources) {
-      const resolved = resolveImport(src, barrelDir, aliases2);
-      if (!resolved) continue;
-      const node = nodeByPath.get(resolved);
-      if (node && node.clientSignals.length > 0) {
-        toAddUseClient.push(resolved);
-      }
-    }
-    if (toAddUseClient.length === 0) {
-      skipped.push(boundary.filePath);
-      continue;
-    }
-    let anyAdded = false;
-    for (const filePath of toAddUseClient) {
-      try {
-        const content = import_node_fs10.default.readFileSync(filePath, "utf-8");
-        if (/^["']use client["']/.test(content)) continue;
-        import_node_fs10.default.writeFileSync(filePath, `"use client";
-${content}`, "utf-8");
-        componentsAdded.push(filePath);
-        anyAdded = true;
-      } catch {
-        skipped.push(filePath);
-      }
-    }
-    if (anyAdded) {
-      try {
-        const original = import_node_fs10.default.readFileSync(boundary.filePath, "utf-8");
-        const patched = removeUseClientDirective(original);
-        if (patched !== original) {
-          import_node_fs10.default.writeFileSync(boundary.filePath, patched, "utf-8");
-          barrelsFixed.push(boundary.filePath);
-        }
-      } catch {
-        skipped.push(boundary.filePath);
-      }
-    }
-  }
-  return { barrelsFixed, componentsAdded, skipped };
-}
-function removeUseClientDirective(content) {
-  return content.replace(/^["']use client["'];?\r?\n/, "");
-}
-
 // src/cli.ts
 var cli = (0, import_cac.cac)("client-creep");
 cli.command("[dir]", "Analyze a Next.js project for client component creep").option("--dir <path>", "Path to the Next.js project (alias for positional arg)").option("--json", "Output results as JSON").option("--html [file]", "Write an interactive HTML report (default: client-creep-report.html)").option("--watch", "Watch for file changes and re-run analysis").option("--ci", "CI mode: exit 1 if client creep is detected").option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold").option("--push", "Push results to the client-creep dashboard").option("--token <token>", "Supabase access token for --push (get from dashboard \u2192 Settings)").option("--dashboard <url>", "Dashboard URL (default: https://client-creep-dashboard.vercel.app)").option("--owner <owner>", "Repo owner override for --push (default: auto-detected from git remote)").option("--repo <name>", "Repo name override for --push (default: auto-detected from git remote)").option("--fix", "Remove 'use client' from files with no client signals (creep candidates)").option("--fix-barrels", "Move 'use client' from barrel files (index.ts) to the components that need it").action(async (dir = ".", options) => {
   const targetDir = options.dir ?? dir ?? ".";
   if (options.watch) {
-    await runWatch(import_node_path11.default.resolve(targetDir));
+    await runWatch(import_node_path12.default.resolve(targetDir), {
+      fix: options.fix,
+      fixBarrels: options.fixBarrels
+    });
     return;
   }
   if (options.push && !options.token) {
@@ -3976,11 +4013,11 @@ cli.command("[dir]", "Analyze a Next.js project for client component creep").opt
         const fixResult = applyFix(result.creepCandidates);
         if (!options.json) {
           for (const f of fixResult.fixed) {
-            console.log(import_picocolors3.default.green(`  \u2713 fixed  `) + import_picocolors3.default.dim(import_node_path11.default.relative(import_node_path11.default.resolve(options.dir ?? dir ?? "."), f)));
+            console.log(import_picocolors3.default.green(`  \u2713 fixed  `) + import_picocolors3.default.dim(import_node_path12.default.relative(import_node_path12.default.resolve(options.dir ?? dir ?? "."), f)));
           }
           if (fixResult.skipped.length > 0) {
             for (const f of fixResult.skipped) {
-              console.log(import_picocolors3.default.yellow(`  \u26A0 skipped `) + import_picocolors3.default.dim(import_node_path11.default.relative(import_node_path11.default.resolve(options.dir ?? dir ?? "."), f)));
+              console.log(import_picocolors3.default.yellow(`  \u26A0 skipped `) + import_picocolors3.default.dim(import_node_path12.default.relative(import_node_path12.default.resolve(options.dir ?? dir ?? "."), f)));
             }
           }
           console.log(import_picocolors3.default.green(`
@@ -3995,10 +4032,10 @@ cli.command("[dir]", "Analyze a Next.js project for client component creep").opt
           console.log(import_picocolors3.default.green("  \u2713 No barrel file boundaries to fix"));
         } else {
           for (const f of barrelResult.barrelsFixed) {
-            console.log(import_picocolors3.default.green("  \u2713 barrel  ") + import_picocolors3.default.dim(import_node_path11.default.relative(import_node_path11.default.resolve(options.dir ?? dir ?? "."), f)) + import_picocolors3.default.dim(" \u2190 removed"));
+            console.log(import_picocolors3.default.green("  \u2713 barrel  ") + import_picocolors3.default.dim(import_node_path12.default.relative(import_node_path12.default.resolve(options.dir ?? dir ?? "."), f)) + import_picocolors3.default.dim(" \u2190 removed"));
           }
           for (const f of barrelResult.componentsAdded) {
-            console.log(import_picocolors3.default.green("  \u2713 added   ") + import_picocolors3.default.dim(import_node_path11.default.relative(import_node_path11.default.resolve(options.dir ?? dir ?? "."), f)) + import_picocolors3.default.dim(' \u2190 "use client"'));
+            console.log(import_picocolors3.default.green("  \u2713 added   ") + import_picocolors3.default.dim(import_node_path12.default.relative(import_node_path12.default.resolve(options.dir ?? dir ?? "."), f)) + import_picocolors3.default.dim(' \u2190 "use client"'));
           }
           console.log(import_picocolors3.default.green(`
   \u2713 Fixed ${barrelResult.barrelsFixed.length} barrel${barrelResult.barrelsFixed.length !== 1 ? "s" : ""}, updated ${barrelResult.componentsAdded.length} component${barrelResult.componentsAdded.length !== 1 ? "s" : ""}`));
