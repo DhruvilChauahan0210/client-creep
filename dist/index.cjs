@@ -43,6 +43,7 @@ var SOURCE_EXTENSIONS = ["ts", "tsx", "js", "jsx", "mjs", "mts"];
 var IGNORE_PATTERNS = [
   "**/node_modules/**",
   "**/.next/**",
+  "**/.remix/**",
   "**/dist/**",
   "**/build/**",
   "**/.git/**",
@@ -59,6 +60,25 @@ async function collectSourceFiles(projectRoot) {
     followSymbolicLinks: false
   });
   return files.filter((f) => import_node_fs.default.existsSync(f));
+}
+function detectFramework(dir) {
+  const exists = (f) => import_node_fs.default.existsSync(import_node_path.default.join(dir, f));
+  if (exists("next.config.js") || exists("next.config.ts") || exists("next.config.mjs") || exists("next.config.cjs")) {
+    return "nextjs";
+  }
+  if (exists("vite.config.ts") || exists("vite.config.js") || exists("vite.config.mjs")) {
+    try {
+      const viteConfig = import_node_fs.default.readFileSync(
+        import_node_path.default.join(dir, exists("vite.config.ts") ? "vite.config.ts" : exists("vite.config.js") ? "vite.config.js" : "vite.config.mjs"),
+        "utf-8"
+      );
+      if (viteConfig.includes("@remix-run")) return "remix";
+      if (viteConfig.includes("react-server") || viteConfig.includes("serverComponents")) return "vite-rsc";
+    } catch {
+    }
+  }
+  if (exists("remix.config.js") || exists("remix.config.ts")) return "remix";
+  return "unknown";
 }
 function resolveProjectRoot(dir) {
   const resolved = import_node_path.default.resolve(dir);
@@ -625,7 +645,7 @@ function detectCreepCandidates(graph, traces) {
   }
   return candidates.sort((a, b) => b.recoverableBytes - a.recoverableBytes);
 }
-function buildAnalysisResult(graph, projectRoot) {
+function buildAnalysisResult(graph, projectRoot, framework = "unknown") {
   const whyTraces = computeWhyTraces(graph);
   const creepCandidates = detectCreepCandidates(graph, whyTraces);
   const clientBoundaries = [];
@@ -647,6 +667,7 @@ function buildAnalysisResult(graph, projectRoot) {
   );
   return {
     projectRoot,
+    framework,
     totalFiles: graph.nodes.size,
     clientBoundaries,
     clientGraph,
@@ -670,10 +691,11 @@ async function analyze(dir = ".") {
   } else {
     setWorkspacePackages(/* @__PURE__ */ new Map());
   }
+  const framework = detectFramework(projectRoot);
   const files = await collectSourceFiles(projectRoot);
   const graph = buildImportGraph(files, projectRoot);
   propagateClientGraph(graph);
-  return buildAnalysisResult(graph, projectRoot);
+  return buildAnalysisResult(graph, projectRoot, framework);
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

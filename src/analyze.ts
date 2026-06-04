@@ -99,7 +99,8 @@ export function detectCreepCandidates(
 
 export function buildAnalysisResult(
   graph: ImportGraph,
-  projectRoot: string
+  projectRoot: string,
+  framework: AnalysisResult["framework"] = "unknown"
 ): AnalysisResult {
   const whyTraces = computeWhyTraces(graph);
   const creepCandidates = detectCreepCandidates(graph, whyTraces);
@@ -127,6 +128,7 @@ export function buildAnalysisResult(
 
   return {
     projectRoot,
+    framework,
     totalFiles: graph.nodes.size,
     clientBoundaries,
     clientGraph,

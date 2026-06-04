@@ -57,7 +57,7 @@ var require_windows = __commonJS({
     init_cjs_shims();
     module2.exports = isexe;
     isexe.sync = sync;
-    var fs8 = require("fs");
+    var fs9 = require("fs");
     function checkPathExt(path11, options) {
       var pathext = options.pathExt !== void 0 ? options.pathExt : process.env.PATHEXT;
       if (!pathext) {
@@ -82,12 +82,12 @@ var require_windows = __commonJS({
       return checkPathExt(path11, options);
     }
     function isexe(path11, options, cb) {
-      fs8.stat(path11, function(er, stat) {
+      fs9.stat(path11, function(er, stat) {
         cb(er, er ? false : checkStat(stat, path11, options));
       });
     }
     function sync(path11, options) {
-      return checkStat(fs8.statSync(path11), path11, options);
+      return checkStat(fs9.statSync(path11), path11, options);
     }
   }
 });
@@ -99,14 +99,14 @@ var require_mode = __commonJS({
     init_cjs_shims();
     module2.exports = isexe;
     isexe.sync = sync;
-    var fs8 = require("fs");
+    var fs9 = require("fs");
     function isexe(path11, options, cb) {
-      fs8.stat(path11, function(er, stat) {
+      fs9.stat(path11, function(er, stat) {
         cb(er, er ? false : checkStat(stat, options));
       });
     }
     function sync(path11, options) {
-      return checkStat(fs8.statSync(path11), options);
+      return checkStat(fs9.statSync(path11), options);
     }
     function checkStat(stat, options) {
       return stat.isFile() && checkMode(stat, options);
@@ -132,7 +132,7 @@ var require_isexe = __commonJS({
   "node_modules/isexe/index.js"(exports2, module2) {
     "use strict";
     init_cjs_shims();
-    var fs8 = require("fs");
+    var fs9 = require("fs");
     var core;
     if (process.platform === "win32" || global.TESTING_WINDOWS) {
       core = require_windows();
@@ -404,16 +404,16 @@ var require_readShebang = __commonJS({
   "node_modules/cross-spawn/lib/util/readShebang.js"(exports2, module2) {
     "use strict";
     init_cjs_shims();
-    var fs8 = require("fs");
+    var fs9 = require("fs");
     var shebangCommand = require_shebang_command();
     function readShebang(command) {
       const size = 150;
       const buffer = Buffer.alloc(size);
       let fd;
       try {
-        fd = fs8.openSync(command, "r");
-        fs8.readSync(fd, buffer, 0, size, 0);
-        fs8.closeSync(fd);
+        fd = fs9.openSync(command, "r");
+        fs9.readSync(fd, buffer, 0, size, 0);
+        fs9.closeSync(fd);
       } catch (e) {
       }
       return shebangCommand(buffer.toString());
@@ -2510,6 +2510,7 @@ var SOURCE_EXTENSIONS = ["ts", "tsx", "js", "jsx", "mjs", "mts"];
 var IGNORE_PATTERNS = [
   "**/node_modules/**",
   "**/.next/**",
+  "**/.remix/**",
   "**/dist/**",
   "**/build/**",
   "**/.git/**",
@@ -2526,6 +2527,25 @@ async function collectSourceFiles(projectRoot) {
     followSymbolicLinks: false
   });
   return files.filter((f) => import_node_fs.default.existsSync(f));
+}
+function detectFramework(dir) {
+  const exists = (f) => import_node_fs.default.existsSync(import_node_path.default.join(dir, f));
+  if (exists("next.config.js") || exists("next.config.ts") || exists("next.config.mjs") || exists("next.config.cjs")) {
+    return "nextjs";
+  }
+  if (exists("vite.config.ts") || exists("vite.config.js") || exists("vite.config.mjs")) {
+    try {
+      const viteConfig = import_node_fs.default.readFileSync(
+        import_node_path.default.join(dir, exists("vite.config.ts") ? "vite.config.ts" : exists("vite.config.js") ? "vite.config.js" : "vite.config.mjs"),
+        "utf-8"
+      );
+      if (viteConfig.includes("@remix-run")) return "remix";
+      if (viteConfig.includes("react-server") || viteConfig.includes("serverComponents")) return "vite-rsc";
+    } catch {
+    }
+  }
+  if (exists("remix.config.js") || exists("remix.config.ts")) return "remix";
+  return "unknown";
 }
 function resolveProjectRoot(dir) {
   const resolved = import_node_path.default.resolve(dir);
@@ -3097,7 +3117,7 @@ function detectCreepCandidates(graph, traces) {
   }
   return candidates.sort((a, b) => b.recoverableBytes - a.recoverableBytes);
 }
-function buildAnalysisResult(graph, projectRoot) {
+function buildAnalysisResult(graph, projectRoot, framework = "unknown") {
   const whyTraces = computeWhyTraces(graph);
   const creepCandidates = detectCreepCandidates(graph, whyTraces);
   const clientBoundaries = [];
@@ -3119,6 +3139,7 @@ function buildAnalysisResult(graph, projectRoot) {
   );
   return {
     projectRoot,
+    framework,
     totalFiles: graph.nodes.size,
     clientBoundaries,
     clientGraph,
@@ -3142,10 +3163,11 @@ async function analyze(dir = ".") {
   } else {
     setWorkspacePackages(/* @__PURE__ */ new Map());
   }
+  const framework = detectFramework(projectRoot);
   const files = await collectSourceFiles(projectRoot);
   const graph = buildImportGraph(files, projectRoot);
   propagateClientGraph(graph);
-  return buildAnalysisResult(graph, projectRoot);
+  return buildAnalysisResult(graph, projectRoot, framework);
 }
 
 // src/render.ts
@@ -3195,8 +3217,14 @@ function renderTerminal(result) {
   const LINE = import_picocolors.default.dim("\u2500".repeat(60));
   console.log();
   console.log(LINE);
+  const frameworkLabel = {
+    nextjs: "Next.js",
+    remix: "Remix",
+    "vite-rsc": "Vite RSC",
+    unknown: "RSC"
+  };
   console.log(
-    import_picocolors.default.bold("  client-creep") + import_picocolors.default.dim("  Next.js client component analysis")
+    import_picocolors.default.bold("  client-creep") + import_picocolors.default.dim(`  ${frameworkLabel[result.framework ?? "unknown"] ?? "RSC"} client component analysis`)
   );
   console.log(LINE);
   console.log();
@@ -3824,9 +3852,35 @@ async function pushToDashboard(result, options, scanDurationMs) {
   }
 }
 
+// src/fix.ts
+init_cjs_shims();
+var import_node_fs10 = __toESM(require("fs"), 1);
+function applyFix(candidates) {
+  const fixed = [];
+  const skipped = [];
+  for (const candidate of candidates) {
+    try {
+      const original = import_node_fs10.default.readFileSync(candidate.filePath, "utf-8");
+      const patched = removeUseClientDirective(original);
+      if (patched === original) {
+        skipped.push(candidate.filePath);
+      } else {
+        import_node_fs10.default.writeFileSync(candidate.filePath, patched, "utf-8");
+        fixed.push(candidate.filePath);
+      }
+    } catch {
+      skipped.push(candidate.filePath);
+    }
+  }
+  return { fixed, skipped };
+}
+function removeUseClientDirective(content) {
+  return content.replace(/^["']use client["'];?\r?\n/, "");
+}
+
 // src/cli.ts
 var cli = (0, import_cac.cac)("client-creep");
-cli.command("[dir]", "Analyze a Next.js project for client component creep").option("--dir <path>", "Path to the Next.js project (alias for positional arg)").option("--json", "Output results as JSON").option("--html [file]", "Write an interactive HTML report (default: client-creep-report.html)").option("--watch", "Watch for file changes and re-run analysis").option("--ci", "CI mode: exit 1 if client creep is detected").option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold").option("--push", "Push results to the client-creep dashboard").option("--token <token>", "Supabase access token for --push (get from dashboard \u2192 Settings)").option("--dashboard <url>", "Dashboard URL (default: https://client-creep-dashboard.vercel.app)").option("--owner <owner>", "Repo owner override for --push (default: auto-detected from git remote)").option("--repo <name>", "Repo name override for --push (default: auto-detected from git remote)").action(async (dir = ".", options) => {
+cli.command("[dir]", "Analyze a Next.js project for client component creep").option("--dir <path>", "Path to the Next.js project (alias for positional arg)").option("--json", "Output results as JSON").option("--html [file]", "Write an interactive HTML report (default: client-creep-report.html)").option("--watch", "Watch for file changes and re-run analysis").option("--ci", "CI mode: exit 1 if client creep is detected").option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold").option("--push", "Push results to the client-creep dashboard").option("--token <token>", "Supabase access token for --push (get from dashboard \u2192 Settings)").option("--dashboard <url>", "Dashboard URL (default: https://client-creep-dashboard.vercel.app)").option("--owner <owner>", "Repo owner override for --push (default: auto-detected from git remote)").option("--repo <name>", "Repo name override for --push (default: auto-detected from git remote)").option("--fix", "Remove 'use client' from files with no client signals (creep candidates)").action(async (dir = ".", options) => {
   const targetDir = options.dir ?? dir ?? ".";
   if (options.watch) {
     await runWatch(import_node_path10.default.resolve(targetDir));
@@ -3857,6 +3911,25 @@ cli.command("[dir]", "Analyze a Next.js project for client component creep").opt
       renderJson(result);
     } else if (!options.html) {
       renderTerminal(result);
+    }
+    if (options.fix) {
+      if (result.creepCandidates.length === 0) {
+        if (!options.json) console.log(import_picocolors3.default.green("  \u2713 No creep candidates to fix"));
+      } else {
+        const fixResult = applyFix(result.creepCandidates);
+        if (!options.json) {
+          for (const f of fixResult.fixed) {
+            console.log(import_picocolors3.default.green(`  \u2713 fixed  `) + import_picocolors3.default.dim(import_node_path10.default.relative(import_node_path10.default.resolve(options.dir ?? dir ?? "."), f)));
+          }
+          if (fixResult.skipped.length > 0) {
+            for (const f of fixResult.skipped) {
+              console.log(import_picocolors3.default.yellow(`  \u26A0 skipped `) + import_picocolors3.default.dim(import_node_path10.default.relative(import_node_path10.default.resolve(options.dir ?? dir ?? "."), f)));
+            }
+          }
+          console.log(import_picocolors3.default.green(`
+  \u2713 Fixed ${fixResult.fixed.length} file${fixResult.fixed.length !== 1 ? "s" : ""}`));
+        }
+      }
     }
     if (options.push && options.token) {
       if (!options.json) {

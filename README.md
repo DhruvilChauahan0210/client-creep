@@ -101,6 +101,9 @@ npx client-creep --watch
 # JSON output (for scripts, CI, tooling)
 npx client-creep --json
 
+# Auto-fix: remove "use client" from files with no client signals
+npx client-creep --fix
+
 # CI mode — exits 1 if any accidental creep is detected
 npx client-creep --ci
 
@@ -119,6 +122,7 @@ npx client-creep --budget 500
 | `--json` | Output results as JSON |
 | `--ci` | Exit code 1 if creep candidates are found |
 | `--budget <kb>` | Exit code 1 if estimated client JS exceeds this KB |
+| `--fix` | Remove `"use client"` from files with no client signals (creep candidates) |
 | `--push` | Push results to the client-creep dashboard |
 | `--token <token>` | Supabase access token for `--push` (get from dashboard → Settings) |
 | `--dashboard <url>` | Dashboard URL (default: `https://client-creep-dashboard.vercel.app`) |

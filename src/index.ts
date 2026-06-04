@@ -1,4 +1,4 @@
-import { collectSourceFiles, resolveProjectRoot } from "./glob.js";
+import { collectSourceFiles, resolveProjectRoot, detectFramework } from "./glob.js";
 import { buildImportGraph, propagateClientGraph } from "./graph.js";
 import { buildAnalysisResult } from "./analyze.js";
 import { resetAliases } from "./resolver.js";
@@ -22,8 +22,9 @@ export async function analyze(dir: string = "."): Promise<AnalysisResult> {
     setWorkspacePackages(new Map());
   }
 
+  const framework = detectFramework(projectRoot);
   const files = await collectSourceFiles(projectRoot);
   const graph = buildImportGraph(files, projectRoot);
   propagateClientGraph(graph);
-  return buildAnalysisResult(graph, projectRoot);
+  return buildAnalysisResult(graph, projectRoot, framework);
 }

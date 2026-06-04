@@ -3,7 +3,7 @@ import {
   analyze,
   resetAliases,
   resetWorkspaceCache
-} from "./chunk-6S57V4DS.js";
+} from "./chunk-CI7J6DCW.js";
 import {
   init_esm_shims
 } from "./chunk-STPGDZXW.js";
@@ -61,8 +61,14 @@ function renderTerminal(result) {
   const LINE = pc.dim("\u2500".repeat(60));
   console.log();
   console.log(LINE);
+  const frameworkLabel = {
+    nextjs: "Next.js",
+    remix: "Remix",
+    "vite-rsc": "Vite RSC",
+    unknown: "RSC"
+  };
   console.log(
-    pc.bold("  client-creep") + pc.dim("  Next.js client component analysis")
+    pc.bold("  client-creep") + pc.dim(`  ${frameworkLabel[result.framework ?? "unknown"] ?? "RSC"} client component analysis`)
   );
   console.log(LINE);
   console.log();
@@ -690,9 +696,35 @@ async function pushToDashboard(result, options, scanDurationMs) {
   }
 }
 
+// src/fix.ts
+init_esm_shims();
+import fs3 from "fs";
+function applyFix(candidates) {
+  const fixed = [];
+  const skipped = [];
+  for (const candidate of candidates) {
+    try {
+      const original = fs3.readFileSync(candidate.filePath, "utf-8");
+      const patched = removeUseClientDirective(original);
+      if (patched === original) {
+        skipped.push(candidate.filePath);
+      } else {
+        fs3.writeFileSync(candidate.filePath, patched, "utf-8");
+        fixed.push(candidate.filePath);
+      }
+    } catch {
+      skipped.push(candidate.filePath);
+    }
+  }
+  return { fixed, skipped };
+}
+function removeUseClientDirective(content) {
+  return content.replace(/^["']use client["'];?\r?\n/, "");
+}
+
 // src/cli.ts
 var cli = cac("client-creep");
-cli.command("[dir]", "Analyze a Next.js project for client component creep").option("--dir <path>", "Path to the Next.js project (alias for positional arg)").option("--json", "Output results as JSON").option("--html [file]", "Write an interactive HTML report (default: client-creep-report.html)").option("--watch", "Watch for file changes and re-run analysis").option("--ci", "CI mode: exit 1 if client creep is detected").option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold").option("--push", "Push results to the client-creep dashboard").option("--token <token>", "Supabase access token for --push (get from dashboard \u2192 Settings)").option("--dashboard <url>", "Dashboard URL (default: https://client-creep-dashboard.vercel.app)").option("--owner <owner>", "Repo owner override for --push (default: auto-detected from git remote)").option("--repo <name>", "Repo name override for --push (default: auto-detected from git remote)").action(async (dir = ".", options) => {
+cli.command("[dir]", "Analyze a Next.js project for client component creep").option("--dir <path>", "Path to the Next.js project (alias for positional arg)").option("--json", "Output results as JSON").option("--html [file]", "Write an interactive HTML report (default: client-creep-report.html)").option("--watch", "Watch for file changes and re-run analysis").option("--ci", "CI mode: exit 1 if client creep is detected").option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold").option("--push", "Push results to the client-creep dashboard").option("--token <token>", "Supabase access token for --push (get from dashboard \u2192 Settings)").option("--dashboard <url>", "Dashboard URL (default: https://client-creep-dashboard.vercel.app)").option("--owner <owner>", "Repo owner override for --push (default: auto-detected from git remote)").option("--repo <name>", "Repo name override for --push (default: auto-detected from git remote)").option("--fix", "Remove 'use client' from files with no client signals (creep candidates)").action(async (dir = ".", options) => {
   const targetDir = options.dir ?? dir ?? ".";
   if (options.watch) {
     await runWatch(path4.resolve(targetDir));
@@ -723,6 +755,25 @@ cli.command("[dir]", "Analyze a Next.js project for client component creep").opt
       renderJson(result);
     } else if (!options.html) {
       renderTerminal(result);
+    }
+    if (options.fix) {
+      if (result.creepCandidates.length === 0) {
+        if (!options.json) console.log(pc3.green("  \u2713 No creep candidates to fix"));
+      } else {
+        const fixResult = applyFix(result.creepCandidates);
+        if (!options.json) {
+          for (const f of fixResult.fixed) {
+            console.log(pc3.green(`  \u2713 fixed  `) + pc3.dim(path4.relative(path4.resolve(options.dir ?? dir ?? "."), f)));
+          }
+          if (fixResult.skipped.length > 0) {
+            for (const f of fixResult.skipped) {
+              console.log(pc3.yellow(`  \u26A0 skipped `) + pc3.dim(path4.relative(path4.resolve(options.dir ?? dir ?? "."), f)));
+            }
+          }
+          console.log(pc3.green(`
+  \u2713 Fixed ${fixResult.fixed.length} file${fixResult.fixed.length !== 1 ? "s" : ""}`));
+        }
+      }
     }
     if (options.push && options.token) {
       if (!options.json) {

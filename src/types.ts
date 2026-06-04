@@ -41,6 +41,7 @@ export interface CreepCandidate {
 
 export interface AnalysisResult {
   projectRoot: string;
+  framework: "nextjs" | "remix" | "vite-rsc" | "unknown";
   totalFiles: number;
   clientBoundaries: ComponentNode[];
   clientGraph: ComponentNode[];

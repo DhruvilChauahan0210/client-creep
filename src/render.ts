@@ -54,9 +54,15 @@ export function renderTerminal(result: AnalysisResult): void {
 
   console.log();
   console.log(LINE);
+  const frameworkLabel: Record<string, string> = {
+    nextjs: "Next.js",
+    remix: "Remix",
+    "vite-rsc": "Vite RSC",
+    unknown: "RSC",
+  };
   console.log(
     pc.bold("  client-creep") +
-    pc.dim("  Next.js client component analysis")
+    pc.dim(`  ${frameworkLabel[result.framework ?? "unknown"] ?? "RSC"} client component analysis`)
   );
   console.log(LINE);
   console.log();

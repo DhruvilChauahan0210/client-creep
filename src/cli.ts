@@ -6,6 +6,7 @@ import { renderTerminal, renderJson } from "./render.js";
 import { renderHtml } from "./render-html.js";
 import { runWatch } from "./watch.js";
 import { pushToDashboard } from "./push.js";
+import { applyFix } from "./fix.js";
 
 const cli = cac("client-creep");
 
@@ -22,6 +23,7 @@ cli
   .option("--dashboard <url>",  "Dashboard URL (default: https://client-creep-dashboard.vercel.app)")
   .option("--owner <owner>",    "Repo owner override for --push (default: auto-detected from git remote)")
   .option("--repo <name>",      "Repo name override for --push (default: auto-detected from git remote)")
+  .option("--fix",              "Remove 'use client' from files with no client signals (creep candidates)")
   .action(async (
     dir: string = ".",
     options: {
@@ -36,6 +38,7 @@ cli
       dashboard?: string;
       owner?: string;
       repo?: string;
+      fix?: boolean;
     }
   ) => {
     const targetDir = options.dir ?? dir ?? ".";
@@ -80,6 +83,26 @@ cli
         renderJson(result);
       } else if (!options.html) {
         renderTerminal(result);
+      }
+
+      // Fix — remove "use client" from creep candidates
+      if (options.fix) {
+        if (result.creepCandidates.length === 0) {
+          if (!options.json) console.log(pc.green("  ✓ No creep candidates to fix"));
+        } else {
+          const fixResult = applyFix(result.creepCandidates);
+          if (!options.json) {
+            for (const f of fixResult.fixed) {
+              console.log(pc.green(`  ✓ fixed  `) + pc.dim(path.relative(path.resolve(options.dir ?? dir ?? "."), f)));
+            }
+            if (fixResult.skipped.length > 0) {
+              for (const f of fixResult.skipped) {
+                console.log(pc.yellow(`  ⚠ skipped `) + pc.dim(path.relative(path.resolve(options.dir ?? dir ?? "."), f)));
+              }
+            }
+            console.log(pc.green(`\n  ✓ Fixed ${fixResult.fixed.length} file${fixResult.fixed.length !== 1 ? "s" : ""}`));
+          }
+        }
       }
 
       // Push to dashboard
