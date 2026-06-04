@@ -47,6 +47,44 @@ body {
 }
 ::selection { background: var(--color-alert-yellow); color: var(--color-midnight-ink); }
 
+/* ─── OPEN SOURCE BADGE ───────────────────────────────────── */
+.oss-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--color-midnight-ink);
+  background: var(--color-action-green);
+  border-radius: 100px;
+  padding: 5px 14px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.oss-badge:hover { opacity: 0.82; }
+
+.nav-oss-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  color: var(--color-midnight-ink);
+  background: var(--color-action-green);
+  border-radius: 100px;
+  padding: 4px 11px;
+  text-decoration: none;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.nav-oss-badge:hover { opacity: 0.82; }
+
 /* ─── NAV ─────────────────────────────────────────────────── */
 .nav {
   position: sticky; top: 0; z-index: 200;

@@ -1,4 +1,5 @@
 const ROWS = [
+  { label: "Open Source", us: "✓ MIT", them1: "✓ MIT", them2: "✓ MIT" },
   { label: "How to use", us: "npx — one shot, zero setup", them1: "Add provider + run app", them2: "npx" },
   { label: "Next.js versions", us: "13 / 14 / 15 / 16", them1: "16+ only ⚠", them2: "any" },
   { label: "Where is the boundary?", us: "✓", them1: "✓ live overlay", them2: "✗" },

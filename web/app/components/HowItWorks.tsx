@@ -19,6 +19,15 @@ export default function HowItWorks() {
               No app running. No runtime dependency. No React version requirement.
               Just reads your source files.
             </p>
+            <a
+              href="https://github.com/DhruvilChauahan0210/client-creep"
+              target="_blank"
+              rel="noopener"
+              className="oss-badge"
+              style={{ marginTop: "24px" }}
+            >
+              ★ Free &amp; Open Source · MIT
+            </a>
           </div>
           <div className="hiw-steps">
             {STEPS.map(step => (

@@ -34,6 +34,14 @@ export default function Nav() {
         </Link>
 
         <div className="nav-links">
+          <a
+            href="https://github.com/DhruvilChauahan0210/client-creep"
+            target="_blank"
+            rel="noopener"
+            className="nav-oss-badge"
+          >
+            ★ Free &amp; Open Source
+          </a>
           {LINKS.map(l => (
             <a key={l.label} href={l.href} className="nav-link"
               target={l.external ? "_blank" : undefined}

@@ -4,9 +4,11 @@ const ITEMS = [
   "269 CREEP CANDIDATES",
   "NEXT.JS 13 → 16",
   "ZERO CONFIG",
+  "FREE & OPEN SOURCE",
   "STATIC ANALYSIS",
   "IMPORT GRAPH TRACE",
   "CI READY",
+  "MIT LICENSE",
 ];
 
 export default function Marquee() {

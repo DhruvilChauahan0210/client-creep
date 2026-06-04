@@ -11,7 +11,16 @@ export default function Footer() {
             </span>
             CLIENT-CREEP
           </div>
-          <span className="footer-version">v0.3.0 · MIT</span>
+          <a
+            href="https://github.com/DhruvilChauahan0210/client-creep"
+            target="_blank"
+            rel="noopener"
+            className="oss-badge"
+            style={{ fontSize: "10px", padding: "3px 10px" }}
+          >
+            ★ Open Source · MIT
+          </a>
+          <span className="footer-version">v0.3.0</span>
         </div>
         <div className="footer-links">
           {[

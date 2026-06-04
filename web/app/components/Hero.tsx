@@ -123,6 +123,13 @@ export default function Hero() {
           <a
             href="https://github.com/DhruvilChauahan0210/client-creep"
             target="_blank" rel="noopener"
+            className="oss-badge"
+          >
+            ★ Free &amp; Open Source
+          </a>
+          <a
+            href="https://github.com/DhruvilChauahan0210/client-creep"
+            target="_blank" rel="noopener"
             className="hero-gh-link"
           >
             GitHub &rarr;
