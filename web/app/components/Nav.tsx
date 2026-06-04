@@ -78,7 +78,7 @@ export default function Nav() {
           </div>
 
           <div className="mobile-menu-footer">
-            <span className="mobile-menu-footer-text">v0.2.3 · MIT · Made by Dhruvil</span>
+            <span className="mobile-menu-footer-text">v0.3.0 · MIT · Made by Dhruvil</span>
           </div>
         </div>
       </div>

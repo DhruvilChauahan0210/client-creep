@@ -104,6 +104,9 @@ npx client-creep --json
 # Auto-fix: remove "use client" from files with no client signals
 npx client-creep --fix
 
+# Auto-fix barrel files: move "use client" from index.ts to individual components
+npx client-creep --fix-barrels
+
 # CI mode — exits 1 if any accidental creep is detected
 npx client-creep --ci
 
@@ -129,6 +132,45 @@ npx client-creep --budget 500
 | `--dashboard <url>` | Dashboard URL (default: `https://client-creep-dashboard.vercel.app`) |
 | `--owner <owner>` | Repo owner override for `--push` (default: auto-detected from git remote) |
 | `--repo <name>` | Repo name override for `--push` (default: auto-detected from git remote) |
+
+---
+
+## Auto-fix
+
+`client-creep` can automatically fix the issues it finds.
+
+### `--fix` — remove unnecessary `"use client"` directives
+
+Removes `"use client"` from every file flagged as an accidental creep candidate — files that have no hooks, event handlers, browser APIs, or client-only package imports.
+
+```bash
+npx client-creep --fix
+```
+
+```
+  ✓ fixed  src/app/chat-insights/components/EmptyStates.tsx
+  ✓ fixed  src/app/chat-insights/components/ErrorBoundary.tsx
+  ✓ Fixed 2 files
+```
+
+Safe to run — only touches files the analyzer has already confirmed have zero client signals.
+
+### `--fix-barrels` — move `"use client"` from barrel files to individual components
+
+A `"use client"` in `index.ts` forces **every** re-export into the client bundle, even components that don't need it. `--fix-barrels` moves the directive from the barrel to only the components that actually have client signals.
+
+```bash
+npx client-creep --fix-barrels
+```
+
+```
+  ✓ barrel  src/components/index.ts ← removed
+  ✓ added   src/components/Counter.tsx ← "use client"
+  ✓ added   src/components/Dialog.tsx ← "use client"
+  ✓ Fixed 1 barrel, updated 2 components
+```
+
+Components with no client signals are left as server components — they don't get `"use client"` added.
 
 ---
 

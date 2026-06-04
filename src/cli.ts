@@ -194,5 +194,5 @@ cli
   });
 
 cli.help();
-cli.version("0.2.3");
+cli.version("0.3.0");
 cli.parse();

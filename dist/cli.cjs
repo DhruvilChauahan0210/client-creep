@@ -3813,7 +3813,7 @@ async function pushToDashboard(result, options, scanDurationMs) {
       recoverableBytes: result.recoverableBytes
     },
     scanDurationMs: scanDurationMs ?? null,
-    engineVersion: "client-creep@0.2.3",
+    engineVersion: "client-creep@0.3.0",
     // Include full JSON payload for the detail view
     payload: {
       projectRoot: result.projectRoot,
@@ -4066,5 +4066,5 @@ cli.command("[dir]", "Analyze a Next.js project for client component creep").opt
   }
 });
 cli.help();
-cli.version("0.2.3");
+cli.version("0.3.0");
 cli.parse();
