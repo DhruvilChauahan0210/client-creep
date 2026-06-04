@@ -27,6 +27,13 @@ const FEATURES = [
     desc: "Auto-detects pnpm-workspace.yaml, turbo.json, and package.json workspaces. Resolves cross-package imports to their source files. No config needed.",
     code: "npx client-creep ./apps/web",
   },
+  {
+    tag: "--push",
+    tagColor: "#a6e3a1",
+    title: "TRACK TRENDS",
+    desc: "Push results to the dashboard after every run or CI build. See how your client boundary evolves across PRs — catch creep before it compounds.",
+    code: "npx client-creep --push --token <token>",
+  },
 ];
 
 export default function Features() {

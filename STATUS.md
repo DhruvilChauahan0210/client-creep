@@ -157,4 +157,4 @@ node /Users/dhruvil/Desktop/client-creep/dist/cli.js \
 | VS Code Marketplace publish | Blocked on Microsoft auth |
 | Add `--push` to marketing site | When v0.2.3 is on npm |
 | Vite/Remix RSC adapters | Expand beyond Next.js |
-| `eslint-plugin-client-creep` v0.2 — `--fix` support | Auto-remove unnecessary boundaries |
+| ~~`eslint-plugin-client-creep` v0.2 — `--fix` support~~ | ✅ Already shipped in v0.1.0 — both rules have `fixable: "code"` with tested fix output |

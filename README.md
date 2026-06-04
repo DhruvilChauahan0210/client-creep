@@ -119,6 +119,11 @@ npx client-creep --budget 500
 | `--json` | Output results as JSON |
 | `--ci` | Exit code 1 if creep candidates are found |
 | `--budget <kb>` | Exit code 1 if estimated client JS exceeds this KB |
+| `--push` | Push results to the client-creep dashboard |
+| `--token <token>` | Supabase access token for `--push` (get from dashboard → Settings) |
+| `--dashboard <url>` | Dashboard URL (default: `https://client-creep-dashboard.vercel.app`) |
+| `--owner <owner>` | Repo owner override for `--push` (default: auto-detected from git remote) |
+| `--repo <name>` | Repo name override for `--push` (default: auto-detected from git remote) |
 
 ---
 
