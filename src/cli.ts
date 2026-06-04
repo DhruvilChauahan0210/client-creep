@@ -6,7 +6,7 @@ import { renderTerminal, renderJson } from "./render.js";
 import { renderHtml } from "./render-html.js";
 import { runWatch } from "./watch.js";
 import { pushToDashboard } from "./push.js";
-import { applyFix } from "./fix.js";
+import { applyFix, fixBarrels } from "./fix.js";
 
 const cli = cac("client-creep");
 
@@ -24,6 +24,7 @@ cli
   .option("--owner <owner>",    "Repo owner override for --push (default: auto-detected from git remote)")
   .option("--repo <name>",      "Repo name override for --push (default: auto-detected from git remote)")
   .option("--fix",              "Remove 'use client' from files with no client signals (creep candidates)")
+  .option("--fix-barrels",      "Move 'use client' from barrel files (index.ts) to the components that need it")
   .action(async (
     dir: string = ".",
     options: {
@@ -39,6 +40,7 @@ cli
       owner?: string;
       repo?: string;
       fix?: boolean;
+      fixBarrels?: boolean;
     }
   ) => {
     const targetDir = options.dir ?? dir ?? ".";
@@ -101,6 +103,24 @@ cli
               }
             }
             console.log(pc.green(`\n  ✓ Fixed ${fixResult.fixed.length} file${fixResult.fixed.length !== 1 ? "s" : ""}`));
+          }
+        }
+      }
+
+      // Fix barrels — move "use client" from index files to individual components
+      if (options.fixBarrels) {
+        const barrelResult = fixBarrels(result);
+        if (!options.json) {
+          if (barrelResult.barrelsFixed.length === 0 && barrelResult.componentsAdded.length === 0) {
+            console.log(pc.green("  ✓ No barrel file boundaries to fix"));
+          } else {
+            for (const f of barrelResult.barrelsFixed) {
+              console.log(pc.green("  ✓ barrel  ") + pc.dim(path.relative(path.resolve(options.dir ?? dir ?? "."), f)) + pc.dim(" ← removed"));
+            }
+            for (const f of barrelResult.componentsAdded) {
+              console.log(pc.green("  ✓ added   ") + pc.dim(path.relative(path.resolve(options.dir ?? dir ?? "."), f)) + pc.dim(' ← "use client"'));
+            }
+            console.log(pc.green(`\n  ✓ Fixed ${barrelResult.barrelsFixed.length} barrel${barrelResult.barrelsFixed.length !== 1 ? "s" : ""}, updated ${barrelResult.componentsAdded.length} component${barrelResult.componentsAdded.length !== 1 ? "s" : ""}`));
           }
         }
       }

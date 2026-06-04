@@ -55,14 +55,11 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Run client-creep
+    - name: Run client-creep on PR branch
       id: run-cc
       shell: bash
       run: |
         ARGS="${{ inputs.dir }}"
-        if [ "${{ inputs.ci }}" = "true" ]; then
-          ARGS="$ARGS --ci"
-        fi
         if [ -n "${{ inputs.budget }}" ]; then
           ARGS="$ARGS --budget ${{ inputs.budget }}"
         fi
@@ -96,8 +93,25 @@ runs:
           " 2>/dev/null || true
         fi
 
-        # Re-run with CI flags to respect exit code (the --json run above swallows it)
-        npx --yes client-creep@${{ inputs.version }} $ARGS --json > /dev/null 2>&1
+        # Re-run with CI flags to respect exit code
+        if [ "${{ inputs.ci }}" = "true" ]; then
+          npx --yes client-creep@${{ inputs.version }} $ARGS --ci --json > /dev/null 2>&1
+        fi
+
+    - name: Run client-creep on base branch (for diff)
+      if: ${{ github.event_name == 'pull_request' && inputs.comment == 'true' }}
+      shell: bash
+      run: |
+        CC_BASE_JSON="$RUNNER_TEMP/client-creep-base.json"
+        WORKTREE_DIR="$RUNNER_TEMP/cc-base-worktree"
+
+        git fetch origin ${{ github.base_ref }} --depth=1 2>/dev/null || true
+        git worktree add "$WORKTREE_DIR" origin/${{ github.base_ref }} 2>/dev/null || true
+
+        if [ -d "$WORKTREE_DIR" ]; then
+          npx --yes client-creep@${{ inputs.version }} "$WORKTREE_DIR/${{ inputs.dir }}" --json > "$CC_BASE_JSON" 2>/dev/null || true
+          git worktree remove "$WORKTREE_DIR" --force 2>/dev/null || true
+        fi
 
     - name: Comment on PR
       if: ${{ github.event_name == 'pull_request' && inputs.comment == 'true' }}
@@ -107,38 +121,61 @@ runs:
         script: |
           const fs = require('fs');
           const jsonFile = process.env.RUNNER_TEMP + '/client-creep-output.json';
+          const baseJsonFile = process.env.RUNNER_TEMP + '/client-creep-base.json';
 
           let data = {};
-          try {
-            data = JSON.parse(fs.readFileSync(jsonFile, 'utf-8'));
-          } catch {
+          try { data = JSON.parse(fs.readFileSync(jsonFile, 'utf-8')); } catch {
             console.log('client-creep: could not read JSON output, skipping PR comment');
             return;
           }
 
+          let baseData = null;
+          try { baseData = JSON.parse(fs.readFileSync(baseJsonFile, 'utf-8')); } catch {}
+
           const s = data.summary ?? {};
+          const b = baseData?.summary ?? null;
+
           const creepCount = s.creepCandidates ?? 0;
           const estimatedKb = ((s.estimatedClientBytes ?? 0) / 1024).toFixed(0);
           const recoverableKb = ((s.recoverableBytes ?? 0) / 1024).toFixed(0);
           const statusIcon = creepCount > 0 ? '⚠️' : '✅';
+
+          function delta(curr, prev, lowerIsBetter = true) {
+            if (prev == null) return '';
+            const d = curr - prev;
+            if (d === 0) return ' *(no change)*';
+            const sign = d > 0 ? '+' : '';
+            const color = (lowerIsBetter ? d > 0 : d < 0) ? '🔴' : '🟢';
+            return ` ${color} \`${sign}${d}\``;
+          }
+
+          const rows = [
+            `| Client components | ${s.clientComponents ?? 0}${delta(s.clientComponents, b?.clientComponents, false)} |`,
+            `| \`"use client"\` boundaries | ${s.clientBoundaries ?? 0}${delta(s.clientBoundaries, b?.clientBoundaries)} |`,
+            `| Accidental creep candidates | ${creepCount}${delta(creepCount, b?.creepCandidates)} |`,
+            `| Estimated client JS | ${estimatedKb} KB${delta(Number(estimatedKb), b ? (b.estimatedClientBytes / 1024) : null)} |`,
+            `| Potentially recoverable | ${recoverableKb} KB |`,
+          ];
+
+          const diffNote = b
+            ? `*Compared against \`${{ github.base_ref }}\`.*`
+            : '';
 
           const body = [
             `## ${statusIcon} client-creep report`,
             '',
             '| Metric | Value |',
             '|---|---|',
-            `| Client components | ${s.clientComponents ?? 0} |`,
-            `| \`"use client"\` boundaries | ${s.clientBoundaries ?? 0} |`,
-            `| Accidental creep candidates | ${creepCount} |`,
-            `| Estimated client JS | ${estimatedKb} KB |`,
-            `| Potentially recoverable | ${recoverableKb} KB |`,
+            ...rows,
             '',
             creepCount > 0
               ? `> **${creepCount} component(s)** are client by accident — run \`npx client-creep\` locally to see the import chains and recover **${recoverableKb} KB**.`
               : '> No accidental client creep detected. ✨',
             '',
+            diffNote,
+            '',
             '<!-- client-creep-comment -->',
-          ].join('\n');
+          ].filter(l => l !== undefined).join('\n');
 
           const { data: comments } = await github.rest.issues.listComments({
             owner: context.repo.owner,

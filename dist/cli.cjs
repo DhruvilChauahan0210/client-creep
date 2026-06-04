@@ -58,7 +58,7 @@ var require_windows = __commonJS({
     module2.exports = isexe;
     isexe.sync = sync;
     var fs9 = require("fs");
-    function checkPathExt(path11, options) {
+    function checkPathExt(path12, options) {
       var pathext = options.pathExt !== void 0 ? options.pathExt : process.env.PATHEXT;
       if (!pathext) {
         return true;
@@ -69,25 +69,25 @@ var require_windows = __commonJS({
       }
       for (var i = 0; i < pathext.length; i++) {
         var p = pathext[i].toLowerCase();
-        if (p && path11.substr(-p.length).toLowerCase() === p) {
+        if (p && path12.substr(-p.length).toLowerCase() === p) {
           return true;
         }
       }
       return false;
     }
-    function checkStat(stat, path11, options) {
+    function checkStat(stat, path12, options) {
       if (!stat.isSymbolicLink() && !stat.isFile()) {
         return false;
       }
-      return checkPathExt(path11, options);
+      return checkPathExt(path12, options);
     }
-    function isexe(path11, options, cb) {
-      fs9.stat(path11, function(er, stat) {
-        cb(er, er ? false : checkStat(stat, path11, options));
+    function isexe(path12, options, cb) {
+      fs9.stat(path12, function(er, stat) {
+        cb(er, er ? false : checkStat(stat, path12, options));
       });
     }
-    function sync(path11, options) {
-      return checkStat(fs9.statSync(path11), path11, options);
+    function sync(path12, options) {
+      return checkStat(fs9.statSync(path12), path12, options);
     }
   }
 });
@@ -100,13 +100,13 @@ var require_mode = __commonJS({
     module2.exports = isexe;
     isexe.sync = sync;
     var fs9 = require("fs");
-    function isexe(path11, options, cb) {
-      fs9.stat(path11, function(er, stat) {
+    function isexe(path12, options, cb) {
+      fs9.stat(path12, function(er, stat) {
         cb(er, er ? false : checkStat(stat, options));
       });
     }
-    function sync(path11, options) {
-      return checkStat(fs9.statSync(path11), options);
+    function sync(path12, options) {
+      return checkStat(fs9.statSync(path12), options);
     }
     function checkStat(stat, options) {
       return stat.isFile() && checkMode(stat, options);
@@ -141,7 +141,7 @@ var require_isexe = __commonJS({
     }
     module2.exports = isexe;
     isexe.sync = sync;
-    function isexe(path11, options, cb) {
+    function isexe(path12, options, cb) {
       if (typeof options === "function") {
         cb = options;
         options = {};
@@ -151,7 +151,7 @@ var require_isexe = __commonJS({
           throw new TypeError("callback not provided");
         }
         return new Promise(function(resolve, reject) {
-          isexe(path11, options || {}, function(er, is) {
+          isexe(path12, options || {}, function(er, is) {
             if (er) {
               reject(er);
             } else {
@@ -160,7 +160,7 @@ var require_isexe = __commonJS({
           });
         });
       }
-      core(path11, options || {}, function(er, is) {
+      core(path12, options || {}, function(er, is) {
         if (er) {
           if (er.code === "EACCES" || options && options.ignoreErrors) {
             er = null;
@@ -170,9 +170,9 @@ var require_isexe = __commonJS({
         cb(er, is);
       });
     }
-    function sync(path11, options) {
+    function sync(path12, options) {
       try {
-        return core.sync(path11, options || {});
+        return core.sync(path12, options || {});
       } catch (er) {
         if (options && options.ignoreErrors || er.code === "EACCES") {
           return false;
@@ -190,7 +190,7 @@ var require_which = __commonJS({
     "use strict";
     init_cjs_shims();
     var isWindows = process.platform === "win32" || process.env.OSTYPE === "cygwin" || process.env.OSTYPE === "msys";
-    var path11 = require("path");
+    var path12 = require("path");
     var COLON = isWindows ? ";" : ":";
     var isexe = require_isexe();
     var getNotFoundError = (cmd) => Object.assign(new Error(`not found: ${cmd}`), { code: "ENOENT" });
@@ -228,7 +228,7 @@ var require_which = __commonJS({
           return opt.all && found.length ? resolve(found) : reject(getNotFoundError(cmd));
         const ppRaw = pathEnv[i];
         const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
-        const pCmd = path11.join(pathPart, cmd);
+        const pCmd = path12.join(pathPart, cmd);
         const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
         resolve(subStep(p, i, 0));
       });
@@ -255,7 +255,7 @@ var require_which = __commonJS({
       for (let i = 0; i < pathEnv.length; i++) {
         const ppRaw = pathEnv[i];
         const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
-        const pCmd = path11.join(pathPart, cmd);
+        const pCmd = path12.join(pathPart, cmd);
         const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
         for (let j = 0; j < pathExt.length; j++) {
           const cur = p + pathExt[j];
@@ -305,7 +305,7 @@ var require_resolveCommand = __commonJS({
   "node_modules/cross-spawn/lib/util/resolveCommand.js"(exports2, module2) {
     "use strict";
     init_cjs_shims();
-    var path11 = require("path");
+    var path12 = require("path");
     var which = require_which();
     var getPathKey = require_path_key();
     function resolveCommandAttempt(parsed, withoutPathExt) {
@@ -323,7 +323,7 @@ var require_resolveCommand = __commonJS({
       try {
         resolved = which.sync(parsed.command, {
           path: env[getPathKey({ env })],
-          pathExt: withoutPathExt ? path11.delimiter : void 0
+          pathExt: withoutPathExt ? path12.delimiter : void 0
         });
       } catch (e) {
       } finally {
@@ -332,7 +332,7 @@ var require_resolveCommand = __commonJS({
         }
       }
       if (resolved) {
-        resolved = path11.resolve(hasCustomCwd ? parsed.options.cwd : "", resolved);
+        resolved = path12.resolve(hasCustomCwd ? parsed.options.cwd : "", resolved);
       }
       return resolved;
     }
@@ -389,8 +389,8 @@ var require_shebang_command = __commonJS({
       if (!match) {
         return null;
       }
-      const [path11, argument] = match[0].replace(/#! ?/, "").split(" ");
-      const binary = path11.split("/").pop();
+      const [path12, argument] = match[0].replace(/#! ?/, "").split(" ");
+      const binary = path12.split("/").pop();
       if (binary === "env") {
         return argument;
       }
@@ -427,7 +427,7 @@ var require_parse = __commonJS({
   "node_modules/cross-spawn/lib/parse.js"(exports2, module2) {
     "use strict";
     init_cjs_shims();
-    var path11 = require("path");
+    var path12 = require("path");
     var resolveCommand = require_resolveCommand();
     var escape = require_escape();
     var readShebang = require_readShebang();
@@ -452,7 +452,7 @@ var require_parse = __commonJS({
       const needsShell = !isExecutableRegExp.test(commandFile);
       if (parsed.options.forceShell || needsShell) {
         const needsDoubleEscapeMetaChars = isCmdShimRegExp.test(commandFile);
-        parsed.command = path11.normalize(parsed.command);
+        parsed.command = path12.normalize(parsed.command);
         parsed.command = escape.command(parsed.command);
         parsed.args = parsed.args.map((arg) => escape.argument(arg, needsDoubleEscapeMetaChars));
         const shellCommand = [parsed.command].concat(parsed.args).join(" ");
@@ -2496,7 +2496,7 @@ var init_execa = __esm({
 init_cjs_shims();
 var import_cac = require("cac");
 var import_picocolors3 = __toESM(require("picocolors"), 1);
-var import_node_path10 = __toESM(require("path"), 1);
+var import_node_path11 = __toESM(require("path"), 1);
 
 // src/index.ts
 init_cjs_shims();
@@ -3855,6 +3855,7 @@ async function pushToDashboard(result, options, scanDurationMs) {
 // src/fix.ts
 init_cjs_shims();
 var import_node_fs10 = __toESM(require("fs"), 1);
+var import_node_path10 = __toESM(require("path"), 1);
 function applyFix(candidates) {
   const fixed = [];
   const skipped = [];
@@ -3874,16 +3875,72 @@ function applyFix(candidates) {
   }
   return { fixed, skipped };
 }
+function fixBarrels(result) {
+  const barrelsFixed = [];
+  const componentsAdded = [];
+  const skipped = [];
+  const nodeByPath = /* @__PURE__ */ new Map();
+  for (const node of [...result.clientBoundaries, ...result.clientGraph]) {
+    nodeByPath.set(node.filePath, node);
+  }
+  const aliases2 = loadAliases(result.projectRoot);
+  for (const boundary of result.clientBoundaries) {
+    const base = import_node_path10.default.basename(boundary.filePath, import_node_path10.default.extname(boundary.filePath));
+    if (base !== "index") continue;
+    const parsed = parseFile(boundary.filePath);
+    if (!parsed.hasUseClient || parsed.reExportSources.length === 0) continue;
+    const barrelDir = import_node_path10.default.dirname(boundary.filePath);
+    const toAddUseClient = [];
+    for (const src of parsed.reExportSources) {
+      const resolved = resolveImport(src, barrelDir, aliases2);
+      if (!resolved) continue;
+      const node = nodeByPath.get(resolved);
+      if (node && node.clientSignals.length > 0) {
+        toAddUseClient.push(resolved);
+      }
+    }
+    if (toAddUseClient.length === 0) {
+      skipped.push(boundary.filePath);
+      continue;
+    }
+    let anyAdded = false;
+    for (const filePath of toAddUseClient) {
+      try {
+        const content = import_node_fs10.default.readFileSync(filePath, "utf-8");
+        if (/^["']use client["']/.test(content)) continue;
+        import_node_fs10.default.writeFileSync(filePath, `"use client";
+${content}`, "utf-8");
+        componentsAdded.push(filePath);
+        anyAdded = true;
+      } catch {
+        skipped.push(filePath);
+      }
+    }
+    if (anyAdded) {
+      try {
+        const original = import_node_fs10.default.readFileSync(boundary.filePath, "utf-8");
+        const patched = removeUseClientDirective(original);
+        if (patched !== original) {
+          import_node_fs10.default.writeFileSync(boundary.filePath, patched, "utf-8");
+          barrelsFixed.push(boundary.filePath);
+        }
+      } catch {
+        skipped.push(boundary.filePath);
+      }
+    }
+  }
+  return { barrelsFixed, componentsAdded, skipped };
+}
 function removeUseClientDirective(content) {
   return content.replace(/^["']use client["'];?\r?\n/, "");
 }
 
 // src/cli.ts
 var cli = (0, import_cac.cac)("client-creep");
-cli.command("[dir]", "Analyze a Next.js project for client component creep").option("--dir <path>", "Path to the Next.js project (alias for positional arg)").option("--json", "Output results as JSON").option("--html [file]", "Write an interactive HTML report (default: client-creep-report.html)").option("--watch", "Watch for file changes and re-run analysis").option("--ci", "CI mode: exit 1 if client creep is detected").option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold").option("--push", "Push results to the client-creep dashboard").option("--token <token>", "Supabase access token for --push (get from dashboard \u2192 Settings)").option("--dashboard <url>", "Dashboard URL (default: https://client-creep-dashboard.vercel.app)").option("--owner <owner>", "Repo owner override for --push (default: auto-detected from git remote)").option("--repo <name>", "Repo name override for --push (default: auto-detected from git remote)").option("--fix", "Remove 'use client' from files with no client signals (creep candidates)").action(async (dir = ".", options) => {
+cli.command("[dir]", "Analyze a Next.js project for client component creep").option("--dir <path>", "Path to the Next.js project (alias for positional arg)").option("--json", "Output results as JSON").option("--html [file]", "Write an interactive HTML report (default: client-creep-report.html)").option("--watch", "Watch for file changes and re-run analysis").option("--ci", "CI mode: exit 1 if client creep is detected").option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold").option("--push", "Push results to the client-creep dashboard").option("--token <token>", "Supabase access token for --push (get from dashboard \u2192 Settings)").option("--dashboard <url>", "Dashboard URL (default: https://client-creep-dashboard.vercel.app)").option("--owner <owner>", "Repo owner override for --push (default: auto-detected from git remote)").option("--repo <name>", "Repo name override for --push (default: auto-detected from git remote)").option("--fix", "Remove 'use client' from files with no client signals (creep candidates)").option("--fix-barrels", "Move 'use client' from barrel files (index.ts) to the components that need it").action(async (dir = ".", options) => {
   const targetDir = options.dir ?? dir ?? ".";
   if (options.watch) {
-    await runWatch(import_node_path10.default.resolve(targetDir));
+    await runWatch(import_node_path11.default.resolve(targetDir));
     return;
   }
   if (options.push && !options.token) {
@@ -3919,15 +3976,32 @@ cli.command("[dir]", "Analyze a Next.js project for client component creep").opt
         const fixResult = applyFix(result.creepCandidates);
         if (!options.json) {
           for (const f of fixResult.fixed) {
-            console.log(import_picocolors3.default.green(`  \u2713 fixed  `) + import_picocolors3.default.dim(import_node_path10.default.relative(import_node_path10.default.resolve(options.dir ?? dir ?? "."), f)));
+            console.log(import_picocolors3.default.green(`  \u2713 fixed  `) + import_picocolors3.default.dim(import_node_path11.default.relative(import_node_path11.default.resolve(options.dir ?? dir ?? "."), f)));
           }
           if (fixResult.skipped.length > 0) {
             for (const f of fixResult.skipped) {
-              console.log(import_picocolors3.default.yellow(`  \u26A0 skipped `) + import_picocolors3.default.dim(import_node_path10.default.relative(import_node_path10.default.resolve(options.dir ?? dir ?? "."), f)));
+              console.log(import_picocolors3.default.yellow(`  \u26A0 skipped `) + import_picocolors3.default.dim(import_node_path11.default.relative(import_node_path11.default.resolve(options.dir ?? dir ?? "."), f)));
             }
           }
           console.log(import_picocolors3.default.green(`
   \u2713 Fixed ${fixResult.fixed.length} file${fixResult.fixed.length !== 1 ? "s" : ""}`));
+        }
+      }
+    }
+    if (options.fixBarrels) {
+      const barrelResult = fixBarrels(result);
+      if (!options.json) {
+        if (barrelResult.barrelsFixed.length === 0 && barrelResult.componentsAdded.length === 0) {
+          console.log(import_picocolors3.default.green("  \u2713 No barrel file boundaries to fix"));
+        } else {
+          for (const f of barrelResult.barrelsFixed) {
+            console.log(import_picocolors3.default.green("  \u2713 barrel  ") + import_picocolors3.default.dim(import_node_path11.default.relative(import_node_path11.default.resolve(options.dir ?? dir ?? "."), f)) + import_picocolors3.default.dim(" \u2190 removed"));
+          }
+          for (const f of barrelResult.componentsAdded) {
+            console.log(import_picocolors3.default.green("  \u2713 added   ") + import_picocolors3.default.dim(import_node_path11.default.relative(import_node_path11.default.resolve(options.dir ?? dir ?? "."), f)) + import_picocolors3.default.dim(' \u2190 "use client"'));
+          }
+          console.log(import_picocolors3.default.green(`
+  \u2713 Fixed ${barrelResult.barrelsFixed.length} barrel${barrelResult.barrelsFixed.length !== 1 ? "s" : ""}, updated ${barrelResult.componentsAdded.length} component${barrelResult.componentsAdded.length !== 1 ? "s" : ""}`));
         }
       }
     }

@@ -123,6 +123,7 @@ npx client-creep --budget 500
 | `--ci` | Exit code 1 if creep candidates are found |
 | `--budget <kb>` | Exit code 1 if estimated client JS exceeds this KB |
 | `--fix` | Remove `"use client"` from files with no client signals (creep candidates) |
+| `--fix-barrels` | Move `"use client"` from barrel files (`index.ts`) to the components that actually need it |
 | `--push` | Push results to the client-creep dashboard |
 | `--token <token>` | Supabase access token for `--push` (get from dashboard → Settings) |
 | `--dashboard <url>` | Dashboard URL (default: `https://client-creep-dashboard.vercel.app`) |

@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 import {
   analyze,
+  loadAliases,
+  parseFile,
   resetAliases,
-  resetWorkspaceCache
-} from "./chunk-CI7J6DCW.js";
+  resetWorkspaceCache,
+  resolveImport
+} from "./chunk-VTHIBN4B.js";
 import {
   init_esm_shims
 } from "./chunk-STPGDZXW.js";
@@ -12,7 +15,7 @@ import {
 init_esm_shims();
 import { cac } from "cac";
 import pc3 from "picocolors";
-import path4 from "path";
+import path5 from "path";
 
 // src/render.ts
 init_esm_shims();
@@ -699,6 +702,7 @@ async function pushToDashboard(result, options, scanDurationMs) {
 // src/fix.ts
 init_esm_shims();
 import fs3 from "fs";
+import path4 from "path";
 function applyFix(candidates) {
   const fixed = [];
   const skipped = [];
@@ -718,16 +722,72 @@ function applyFix(candidates) {
   }
   return { fixed, skipped };
 }
+function fixBarrels(result) {
+  const barrelsFixed = [];
+  const componentsAdded = [];
+  const skipped = [];
+  const nodeByPath = /* @__PURE__ */ new Map();
+  for (const node of [...result.clientBoundaries, ...result.clientGraph]) {
+    nodeByPath.set(node.filePath, node);
+  }
+  const aliases = loadAliases(result.projectRoot);
+  for (const boundary of result.clientBoundaries) {
+    const base = path4.basename(boundary.filePath, path4.extname(boundary.filePath));
+    if (base !== "index") continue;
+    const parsed = parseFile(boundary.filePath);
+    if (!parsed.hasUseClient || parsed.reExportSources.length === 0) continue;
+    const barrelDir = path4.dirname(boundary.filePath);
+    const toAddUseClient = [];
+    for (const src of parsed.reExportSources) {
+      const resolved = resolveImport(src, barrelDir, aliases);
+      if (!resolved) continue;
+      const node = nodeByPath.get(resolved);
+      if (node && node.clientSignals.length > 0) {
+        toAddUseClient.push(resolved);
+      }
+    }
+    if (toAddUseClient.length === 0) {
+      skipped.push(boundary.filePath);
+      continue;
+    }
+    let anyAdded = false;
+    for (const filePath of toAddUseClient) {
+      try {
+        const content = fs3.readFileSync(filePath, "utf-8");
+        if (/^["']use client["']/.test(content)) continue;
+        fs3.writeFileSync(filePath, `"use client";
+${content}`, "utf-8");
+        componentsAdded.push(filePath);
+        anyAdded = true;
+      } catch {
+        skipped.push(filePath);
+      }
+    }
+    if (anyAdded) {
+      try {
+        const original = fs3.readFileSync(boundary.filePath, "utf-8");
+        const patched = removeUseClientDirective(original);
+        if (patched !== original) {
+          fs3.writeFileSync(boundary.filePath, patched, "utf-8");
+          barrelsFixed.push(boundary.filePath);
+        }
+      } catch {
+        skipped.push(boundary.filePath);
+      }
+    }
+  }
+  return { barrelsFixed, componentsAdded, skipped };
+}
 function removeUseClientDirective(content) {
   return content.replace(/^["']use client["'];?\r?\n/, "");
 }
 
 // src/cli.ts
 var cli = cac("client-creep");
-cli.command("[dir]", "Analyze a Next.js project for client component creep").option("--dir <path>", "Path to the Next.js project (alias for positional arg)").option("--json", "Output results as JSON").option("--html [file]", "Write an interactive HTML report (default: client-creep-report.html)").option("--watch", "Watch for file changes and re-run analysis").option("--ci", "CI mode: exit 1 if client creep is detected").option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold").option("--push", "Push results to the client-creep dashboard").option("--token <token>", "Supabase access token for --push (get from dashboard \u2192 Settings)").option("--dashboard <url>", "Dashboard URL (default: https://client-creep-dashboard.vercel.app)").option("--owner <owner>", "Repo owner override for --push (default: auto-detected from git remote)").option("--repo <name>", "Repo name override for --push (default: auto-detected from git remote)").option("--fix", "Remove 'use client' from files with no client signals (creep candidates)").action(async (dir = ".", options) => {
+cli.command("[dir]", "Analyze a Next.js project for client component creep").option("--dir <path>", "Path to the Next.js project (alias for positional arg)").option("--json", "Output results as JSON").option("--html [file]", "Write an interactive HTML report (default: client-creep-report.html)").option("--watch", "Watch for file changes and re-run analysis").option("--ci", "CI mode: exit 1 if client creep is detected").option("--budget <kb>", "Fail CI if estimated client JS exceeds this KB threshold").option("--push", "Push results to the client-creep dashboard").option("--token <token>", "Supabase access token for --push (get from dashboard \u2192 Settings)").option("--dashboard <url>", "Dashboard URL (default: https://client-creep-dashboard.vercel.app)").option("--owner <owner>", "Repo owner override for --push (default: auto-detected from git remote)").option("--repo <name>", "Repo name override for --push (default: auto-detected from git remote)").option("--fix", "Remove 'use client' from files with no client signals (creep candidates)").option("--fix-barrels", "Move 'use client' from barrel files (index.ts) to the components that need it").action(async (dir = ".", options) => {
   const targetDir = options.dir ?? dir ?? ".";
   if (options.watch) {
-    await runWatch(path4.resolve(targetDir));
+    await runWatch(path5.resolve(targetDir));
     return;
   }
   if (options.push && !options.token) {
@@ -763,15 +823,32 @@ cli.command("[dir]", "Analyze a Next.js project for client component creep").opt
         const fixResult = applyFix(result.creepCandidates);
         if (!options.json) {
           for (const f of fixResult.fixed) {
-            console.log(pc3.green(`  \u2713 fixed  `) + pc3.dim(path4.relative(path4.resolve(options.dir ?? dir ?? "."), f)));
+            console.log(pc3.green(`  \u2713 fixed  `) + pc3.dim(path5.relative(path5.resolve(options.dir ?? dir ?? "."), f)));
           }
           if (fixResult.skipped.length > 0) {
             for (const f of fixResult.skipped) {
-              console.log(pc3.yellow(`  \u26A0 skipped `) + pc3.dim(path4.relative(path4.resolve(options.dir ?? dir ?? "."), f)));
+              console.log(pc3.yellow(`  \u26A0 skipped `) + pc3.dim(path5.relative(path5.resolve(options.dir ?? dir ?? "."), f)));
             }
           }
           console.log(pc3.green(`
   \u2713 Fixed ${fixResult.fixed.length} file${fixResult.fixed.length !== 1 ? "s" : ""}`));
+        }
+      }
+    }
+    if (options.fixBarrels) {
+      const barrelResult = fixBarrels(result);
+      if (!options.json) {
+        if (barrelResult.barrelsFixed.length === 0 && barrelResult.componentsAdded.length === 0) {
+          console.log(pc3.green("  \u2713 No barrel file boundaries to fix"));
+        } else {
+          for (const f of barrelResult.barrelsFixed) {
+            console.log(pc3.green("  \u2713 barrel  ") + pc3.dim(path5.relative(path5.resolve(options.dir ?? dir ?? "."), f)) + pc3.dim(" \u2190 removed"));
+          }
+          for (const f of barrelResult.componentsAdded) {
+            console.log(pc3.green("  \u2713 added   ") + pc3.dim(path5.relative(path5.resolve(options.dir ?? dir ?? "."), f)) + pc3.dim(' \u2190 "use client"'));
+          }
+          console.log(pc3.green(`
+  \u2713 Fixed ${barrelResult.barrelsFixed.length} barrel${barrelResult.barrelsFixed.length !== 1 ? "s" : ""}, updated ${barrelResult.componentsAdded.length} component${barrelResult.componentsAdded.length !== 1 ? "s" : ""}`));
         }
       }
     }
